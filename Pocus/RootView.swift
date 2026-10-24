@@ -34,9 +34,7 @@ struct RootView: View {
         .sheet(item: $router.detailActivityID) { id in
             TrackerDetailView(activityID: id)
         }
-        .sheet(isPresented: $router.showingNewTracker) {
-            NewTrackerView()
-        }
+        .newTrackerOverlay(isPresented: $router.showingNewTracker)
     }
 }
 
