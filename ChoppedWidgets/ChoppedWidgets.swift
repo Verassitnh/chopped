@@ -4,7 +4,7 @@ import SwiftUI
 import WidgetKit
 
 @main
-struct PocusWidgets: WidgetBundle {
+struct ChoppedWidgets: WidgetBundle {
     var body: some Widget {
         ClockInLiveActivity()
         TrackersWidget()
@@ -20,7 +20,7 @@ struct PocusWidgets: WidgetBundle {
 
 struct ClockInLiveActivity: Widget {
     var body: some WidgetConfiguration {
-        ActivityConfiguration(for: PocusActivityAttributes.self) { context in
+        ActivityConfiguration(for: ChoppedActivityAttributes.self) { context in
             LockActivityView(state: context.state, isStale: context.isStale)
                 .activityBackgroundTint(context.state.color.tint)
                 .activitySystemActionForegroundColor(.white)

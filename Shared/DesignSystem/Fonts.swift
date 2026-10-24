@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-/// Bundled fonts (registered via UIAppFonts in Pocus-Info.plist and PocusWidgets-Info.plist).
+/// Bundled fonts (registered via UIAppFonts in Chopped-Info.plist and ChoppedWidgets-Info.plist).
 /// Sizes are fixed points (no Dynamic Type scaling) so layouts match the Paper artboards.
 enum GeistWeight {
     case regular, medium, semibold, bold

@@ -1,6 +1,6 @@
-# Chopped: Focus Time — build spec
+# Chopped: Time Tracker — build spec
 
-The Xcode project is still named **Pocus** (targets `Pocus`, `PocusWidgets`). We are **replacing the existing Pocus UI in place** with the Chopped design. Keep the existing AppIcon (`Pocus/AppIcon.icon`). User-facing name = **Chopped** (home screen label), full name "Chopped: Focus Time".
+The Xcode project is `Chopped.xcodeproj` (targets `Chopped`, `ChoppedWidgets`). The app was originally called Pocus; the Chopped design replaced the old Pocus UI in place. Keep the existing AppIcon (`Chopped/AppIcon.icon`). User-facing name = **Chopped** (home screen label), full name "Chopped: Time Tracker".
 
 ## Source of truth
 - Paper file `01M5P16A2BNS9XSW8JFT3NNGP4` (Paper MCP tools: `get_jsx`, `get_computed_styles`, `get_tree_summary`, `get_screenshot`). Use these for exact px values — never eyeball from PNGs when a value can be read.
@@ -38,11 +38,11 @@ Activity needs: `icon` (string key), `goalMinutes`, `period` (day/week/month/yea
 
 ## QC harness (required)
 - Launch args: `-QCScreen <home|detail|stats|trackerStats|newTracker>` opens that screen directly; `-QCDemo` seeds deterministic demo data matching the designs (Deep Work running 00:50:01 started 20:06, 22:49 of 25h week, Meetings 5:24, Exercise 0:30/0:45, Email 0:27, Reading …; use values in the designs) into a separate in-memory/temporary DB, and freezes "now" so timers match.
-- `-QCSnapshot` → after layout settles (~1.5s), render key window to PNG at native scale and write to app Documents as `qc-<screen>.png`. Pull from device with `xcrun devicectl device copy from --device <udid> --domain-type appDataContainer --domain-identifier com.jackson.Pocus --source Documents/qc-home.png --destination <path>`.
+- `-QCSnapshot` → after layout settles (~1.5s), render key window to PNG at native scale and write to app Documents as `qc-<screen>.png`. Pull from device with `xcrun devicectl device copy from --device <udid> --domain-type appDataContainer --domain-identifier com.jackson.chopped --source Documents/qc-home.png --destination <path>`.
 - Simulator for fast iteration: iPhone 18 Pro Max `73276883-8B7C-4FD1-A8E0-30F60ADA31DC` (440pt wide, matches artboards). Device: iPhone 15 Pro Max `00008130-000949181A06001C` (430pt wide — layout must be fluid, not hard-coded to 440).
 
 ## Build
-`export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`. Use a private `-derivedDataPath` per agent (e.g. `/tmp/dd-<agent>`) so parallel builds don't collide. Team `QBWSX5JLV3`, automatic signing; bundle ids `com.jackson.Pocus`, `com.jackson.Pocus.Widgets`. Project uses fileSystemSynchronizedGroups (new files in `Pocus/`, `PocusWidgets/`, `Shared/` are auto-included; check target membership for Shared).
+`export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`. Use a private `-derivedDataPath` per agent (e.g. `/tmp/dd-<agent>`) so parallel builds don't collide. Team `QBWSX5JLV3`, automatic signing; bundle ids `com.jackson.chopped`, `com.jackson.chopped.widgets`. Project uses fileSystemSynchronizedGroups (new files in `Chopped/`, `ChoppedWidgets/`, `Shared/` are auto-included; check target membership for Shared).
 
 ## Animations (subtle, reasonable)
 Spring (response ~0.35, damping ~0.85) for start/stop card transitions; numeric text transitions (`.contentTransition(.numericText())`) on timers/totals where appropriate; segment ticks fill with a short stagger; sheet presentations use system sheets; button press scale 0.96; chart bars grow in on first appear (≤0.5s). Respect Reduce Motion.

@@ -1,6 +1,6 @@
 import SwiftUI
 
-// Chopped-styled replacements for the legacy SessionsEditor / NewSessionSheet (Pocus/Legacy).
+// Chopped-styled replacements for the legacy SessionsEditor / NewSessionSheet (Chopped/Legacy).
 // Same behaviour: fix a clock-in's start/end (or stop a running one at an earlier time),
 // delete it, or log time after the fact. Moving the start keeps the duration, like Calendar.
 

@@ -6,7 +6,7 @@ enum LiveActivityController {
     static func sync(session: WorkSession?, activity: Activity?, periodBase: TimeInterval? = nil) {
         let state = session.flatMap { session in
             activity.map { activity in
-                PocusActivityAttributes.ContentState(
+                ChoppedActivityAttributes.ContentState(
                     name: activity.name, colorHex: activity.colorHex, start: session.start,
                     icon: activity.icon, periodBase: periodBase, goalMinutes: activity.goalMinutes,
                     period: activity.period.rawValue, trackerID: activity.id)

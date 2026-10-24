@@ -1,12 +1,20 @@
 import Foundation
 import SQLite3
 
-/// App Group shared by the app and the widget extension (entitlements: Pocus.entitlements / PocusWidgets.entitlements).
+/// App Group shared by the app and the widget extension (entitlements: Chopped.entitlements / ChoppedWidgets.entitlements).
 enum AppGroup {
-    static let id = "group.com.jackson.Pocus"
+    static let id = "group.com.jackson.chopped"
+
+    /// The group used by the app when it shipped as "Pocus" (bundle id com.jackson.Pocus). Both entitlements
+    /// still list it so the first launch can copy the user's database across. Read-only: never written to.
+    static let legacyID = "group.com.jackson.Pocus"
 
     static var containerURL: URL? {
         FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: id)
+    }
+
+    static var legacyContainerURL: URL? {
+        FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: legacyID)
     }
 
     static let defaults = UserDefaults(suiteName: id)
@@ -21,24 +29,30 @@ enum AppGroup {
 
 /// Location of the SQLite database, shared through the App Group.
 ///
-/// The database used to live in the app's own Application Support directory. `appURL` moves it into the
-/// group container once (copy, then the old file is renamed to `pocus-pre-appgroup.sqlite` as a backup), so
-/// the widget extension and App Intents can read and write the same data. The widget extension only ever
-/// opens an *existing* database (`existingURL`): it must never create an empty file before the app has
-/// migrated, or the migration would be skipped.
+/// `appURL` seeds the group database once, the first time the app opens it, from (in order):
+/// 1. the old "Pocus" App Group (`group.com.jackson.Pocus/pocus.sqlite`): copied, the original is left intact;
+/// 2. the app's own Application Support directory (`pocus.sqlite`, from before the App Group existed): copied,
+///    then the old file is renamed to `pocus-pre-appgroup.sqlite` as a backup.
+/// The widget extension only ever opens an *existing* database (`existingURL`): it must never create an empty
+/// file before the app has migrated, or the migration would be skipped.
 enum ChoppedDB {
-    static let fileName = "pocus.sqlite"
+    static let fileName = "chopped.sqlite"
+    /// File name used by the Pocus-era app, both in its App Group and in its sandbox.
+    static let legacyFileName = "pocus.sqlite"
 
     static var groupURL: URL? { AppGroup.containerURL?.appendingPathComponent(fileName) }
+
+    /// The database in the old Pocus App Group, if that group is reachable.
+    static var legacyGroupURL: URL? { AppGroup.legacyContainerURL?.appendingPathComponent(legacyFileName) }
 
     /// The app's pre-App-Group location (only meaningful inside the app process).
     static var legacyURL: URL {
         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appendingPathComponent(fileName)
+        return dir.appendingPathComponent(legacyFileName)
     }
 
-    /// App process: shared DB URL, migrating the legacy file on first use. Falls back to the legacy
+    /// App process: shared DB URL, migrating an older database on first use. Falls back to the legacy
     /// location if the App Group container is unavailable (e.g. missing entitlement).
     static var appURL: URL {
         guard let group = groupURL else { return legacyURL }
@@ -57,27 +71,43 @@ enum ChoppedDB {
 
     private static func migrateIfNeeded(to group: URL) {
         let fm = FileManager.default
-        let legacy = legacyURL
-        guard !fm.fileExists(atPath: group.path), fm.fileExists(atPath: legacy.path) else { return }
-        do {
-            // Copy side files first so the main file only appears once everything is in place.
-            for suffix in ["-wal", "-shm", "-journal"] {
-                let src = URL(fileURLWithPath: legacy.path + suffix)
-                if fm.fileExists(atPath: src.path) {
-                    try? fm.copyItem(at: src, to: URL(fileURLWithPath: group.path + suffix))
-                }
+        guard !fm.fileExists(atPath: group.path) else { return }
+        if let old = legacyGroupURL, fm.fileExists(atPath: old.path) {
+            if copyDatabase(from: old, to: group) {
+                NSLog("ChoppedDB: copied database from \(AppGroup.legacyID)")
             }
-            let tmp = group.deletingLastPathComponent().appendingPathComponent("pocus-migrating.sqlite")
-            try? fm.removeItem(at: tmp)
-            try fm.copyItem(at: legacy, to: tmp)
-            try fm.moveItem(at: tmp, to: group)
+            return
+        }
+        let legacy = legacyURL
+        guard fm.fileExists(atPath: legacy.path) else { return }
+        if copyDatabase(from: legacy, to: group) {
             // Keep the original as a backup instead of deleting it.
             let backup = legacy.deletingLastPathComponent().appendingPathComponent("pocus-pre-appgroup.sqlite")
             try? fm.removeItem(at: backup)
             try? fm.moveItem(at: legacy, to: backup)
             NSLog("ChoppedDB: migrated database to App Group container")
+        }
+    }
+
+    /// Copies a SQLite database plus its side files. The source is never modified. Side files go first and
+    /// the main file appears last (via a temp name), so a half-finished copy never looks like a database.
+    private static func copyDatabase(from source: URL, to dest: URL) -> Bool {
+        let fm = FileManager.default
+        do {
+            for suffix in ["-wal", "-shm", "-journal"] {
+                let src = URL(fileURLWithPath: source.path + suffix)
+                let dst = URL(fileURLWithPath: dest.path + suffix)
+                try? fm.removeItem(at: dst)
+                if fm.fileExists(atPath: src.path) { try? fm.copyItem(at: src, to: dst) }
+            }
+            let tmp = dest.deletingLastPathComponent().appendingPathComponent("chopped-migrating.sqlite")
+            try? fm.removeItem(at: tmp)
+            try fm.copyItem(at: source, to: tmp)
+            try fm.moveItem(at: tmp, to: dest)
+            return true
         } catch {
-            NSLog("ChoppedDB: migration failed: \(error)")
+            NSLog("ChoppedDB: migration from \(source.path) failed: \(error)")
+            return false
         }
     }
 }
@@ -132,9 +162,9 @@ struct ChoppedSnapshot: Hashable {
     }
 
     /// Live Activity state for the running tracker (nil when idle).
-    var activityState: PocusActivityAttributes.ContentState? {
+    var activityState: ChoppedActivityAttributes.ContentState? {
         guard let r = running, let start = r.runningStart else { return nil }
-        return PocusActivityAttributes.ContentState(
+        return ChoppedActivityAttributes.ContentState(
             name: r.name, colorHex: r.colorHex, start: start, icon: r.icon,
             periodBase: r.periodBase, goalMinutes: r.goalMinutes, period: r.period.rawValue, trackerID: r.id)
     }

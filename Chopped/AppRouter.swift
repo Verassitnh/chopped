@@ -3,7 +3,7 @@ import SwiftUI
 
 enum AppTab: Hashable { case track, stats }
 
-/// App navigation state. Injected into the environment by `PocusApp`; screens read it with
+/// App navigation state. Injected into the environment by `ChoppedApp`; screens read it with
 /// `@Environment(AppRouter.self) private var router`.
 @Observable
 final class AppRouter {

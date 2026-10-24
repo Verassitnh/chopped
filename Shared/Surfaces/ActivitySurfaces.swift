@@ -1,6 +1,6 @@
 import SwiftUI
 
-typealias ClockInState = PocusActivityAttributes.ContentState
+typealias ClockInState = ChoppedActivityAttributes.ContentState
 
 // MARK: - 06 Lock screen Live Activity (Paper B7A-0)
 

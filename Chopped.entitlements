@@ -4,6 +4,7 @@
 <dict>
 	<key>com.apple.security.application-groups</key>
 	<array>
+		<string>group.com.jackson.chopped</string>
 		<string>group.com.jackson.Pocus</string>
 	</array>
 </dict>

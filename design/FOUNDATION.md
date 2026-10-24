@@ -1,6 +1,6 @@
 # Chopped foundation — API reference
 
-Everything screen engineers need. Read `design/SPEC.md` first. Project/targets are still named **Pocus**.
+Everything screen engineers need. Read `design/SPEC.md` first. App: **Chopped: Time Tracker** (home-screen label "Chopped"). Project `Chopped.xcodeproj`, targets/schemes `Chopped` + `ChoppedWidgets`, bundle ids `com.jackson.chopped` / `com.jackson.chopped.widgets`, App Group `group.com.jackson.chopped` (DB `chopped.sqlite`). The app was originally called Pocus; on first launch `ChoppedDB` copies `pocus.sqlite` from the old App Group `group.com.jackson.Pocus` (still listed in both entitlements) and leaves the original untouched.
 
 ## File map
 
@@ -14,19 +14,19 @@ Everything screen engineers need. Read `design/SPEC.md` first. Project/targets a
 | `Shared/DesignSystem/Components.swift` | `IconTile`, `PlayButton`, `StopButton`, `SegmentStrip`, `TrackerBezel`, `SectionLabel`, `GlassCircleButton`, `CircleIconButton`, `PressScaleStyle`, `Motion` | app + widgets |
 | `Shared/DesignSystem/Format.swift` | `Fmt` number formats, `Calendar.chopped` (Monday weeks) | app + widgets |
 | `Shared/AppClock.swift` | `AppClock.now` (freezable), `Ticker` | app + widgets |
-| `Shared/PocusActivityAttributes.swift` | Live Activity state (+ icon, periodBase, goalMinutes, period) | app + widgets |
-| `Pocus/Store.swift` | `Activity`, `WorkSession`, `Store` + stats helpers | app |
-| `Pocus/Database.swift` | SQLite wrapper + migrations (`PRAGMA user_version`) | app |
-| `Pocus/AppRouter.swift` | `AppRouter`, `AppTab` | app |
-| `Pocus/RootView.swift` | Tabs + glass tab bar + sheets (`GlassTabBar`) | app |
-| `Pocus/Screens/HomeView.swift` | 01 Home — **placeholder** (font specimen) | app |
-| `Pocus/Screens/TrackerDetailView.swift` | 02 Detail sheet — placeholder, `init(activityID:)` | app |
-| `Pocus/Screens/StatsView.swift` | 03 Stats — placeholder | app |
-| `Pocus/Screens/TrackerStatsView.swift` | 04 Tracker stats — placeholder, `init(activityID:)` | app |
-| `Pocus/Screens/NewTrackerView.swift` | 05 New tracker sheet — placeholder | app |
-| `Pocus/Legacy/SessionEditors.swift` | Old unstyled `SessionsEditor`, `NewSessionSheet` (fix times / add time logic) — restyle or replace | app |
-| `Pocus/QC/QC.swift`, `Pocus/QC/DemoData.swift` | QC harness + demo data | app |
-| `Pocus-Info.plist`, `PocusWidgets-Info.plist` | UIAppFonts (merged with generated Info.plist keys) | — |
+| `Shared/ChoppedActivityAttributes.swift` | Live Activity state (+ icon, periodBase, goalMinutes, period) | app + widgets |
+| `Chopped/Store.swift` | `Activity`, `WorkSession`, `Store` + stats helpers | app |
+| `Chopped/Database.swift` | SQLite wrapper + migrations (`PRAGMA user_version`) | app |
+| `Chopped/AppRouter.swift` | `AppRouter`, `AppTab` | app |
+| `Chopped/RootView.swift` | Tabs + glass tab bar + sheets (`GlassTabBar`) | app |
+| `Chopped/Screens/HomeView.swift` | 01 Home — **placeholder** (font specimen) | app |
+| `Chopped/Screens/TrackerDetailView.swift` | 02 Detail sheet — placeholder, `init(activityID:)` | app |
+| `Chopped/Screens/StatsView.swift` | 03 Stats — placeholder | app |
+| `Chopped/Screens/TrackerStatsView.swift` | 04 Tracker stats — placeholder, `init(activityID:)` | app |
+| `Chopped/Screens/NewTrackerView.swift` | 05 New tracker sheet — placeholder | app |
+| `Chopped/Legacy/SessionEditors.swift` | Old unstyled `SessionsEditor`, `NewSessionSheet` (fix times / add time logic) — restyle or replace | app |
+| `Chopped/QC/QC.swift`, `Chopped/QC/DemoData.swift` | QC harness + demo data | app |
+| `Chopped-Info.plist`, `ChoppedWidgets-Info.plist` | UIAppFonts (merged with generated Info.plist keys) | — |
 
 `Shared/` is a synchronized group in **both** targets (verified in project.pbxproj), so new files there compile into the app and the widget extension. Don't put `Store`/`Activity` types in Shared code: they're app-only.
 
@@ -249,10 +249,10 @@ At launch the app logs `QC demo=… missingFonts=[]` and, in demo mode, a `QC de
 ```sh
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 SIM=73276883-8B7C-4FD1-A8E0-30F60ADA31DC; DD=/tmp/dd-<you>
-xcodebuild -project Pocus.xcodeproj -scheme Pocus -destination "id=$SIM" -derivedDataPath $DD build
-xcrun simctl boot $SIM 2>/dev/null; xcrun simctl install $SIM $DD/Build/Products/Debug-iphonesimulator/Pocus.app
-xcrun simctl terminate $SIM com.jackson.Pocus; xcrun simctl launch $SIM com.jackson.Pocus -QCDemo -QCScreen home -QCSnapshot
-sleep 4; cp "$(xcrun simctl get_app_container $SIM com.jackson.Pocus data)/Documents/qc-home.png" /tmp/qc-home.png
+xcodebuild -project Chopped.xcodeproj -scheme Chopped -destination "id=$SIM" -derivedDataPath $DD build
+xcrun simctl boot $SIM 2>/dev/null; xcrun simctl install $SIM $DD/Build/Products/Debug-iphonesimulator/Chopped.app
+xcrun simctl terminate $SIM com.jackson.chopped; xcrun simctl launch $SIM com.jackson.chopped -QCDemo -QCScreen home -QCSnapshot
+sleep 4; cp "$(xcrun simctl get_app_container $SIM com.jackson.chopped data)/Documents/qc-home.png" /tmp/qc-home.png
 xcrun simctl spawn $SIM log show --last 1m --style compact --predicate 'eventMessage CONTAINS "QC"'   # logs
 ```
 Don't use `simctl launch --console-pty … &`. The backgrounded process gets killed with the shell before the snapshot is written.
@@ -261,10 +261,10 @@ Don't use `simctl launch --console-pty … &`. The backgrounded process gets kil
 ```sh
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 U=00008130-000949181A06001C; DD=/tmp/dd-<you>
-xcodebuild -project Pocus.xcodeproj -scheme Pocus -destination "id=$U" -derivedDataPath $DD -allowProvisioningUpdates build
-xcrun devicectl device install app --device $U $DD/Build/Products/Debug-iphoneos/Pocus.app
-xcrun devicectl device process launch --device $U --terminate-existing com.jackson.Pocus -- -QCDemo -QCScreen home -QCSnapshot
-sleep 6; xcrun devicectl device copy from --device $U --domain-type appDataContainer --domain-identifier com.jackson.Pocus \
+xcodebuild -project Chopped.xcodeproj -scheme Chopped -destination "id=$U" -derivedDataPath $DD -allowProvisioningUpdates build
+xcrun devicectl device install app --device $U $DD/Build/Products/Debug-iphoneos/Chopped.app
+xcrun devicectl device process launch --device $U --terminate-existing com.jackson.chopped -- -QCDemo -QCScreen home -QCSnapshot
+sleep 6; xcrun devicectl device copy from --device $U --domain-type appDataContainer --domain-identifier com.jackson.chopped \
   --source Documents/qc-home.png --destination /tmp/qc-home-device.png
 ```
 The first launch right after an install sometimes fails with "Application failed preflight checks (FBSOpenApplicationErrorDomain 3)". Run the launch command again.
@@ -368,7 +368,7 @@ those were changed. The rich graphics were kept except where they contradicted e
 
 ## Gotchas
 
-- **Info.plists.** The app uses `GENERATE_INFOPLIST_FILE` and `INFOPLIST_FILE = Pocus-Info.plist` together. They merge, and the plist only holds `UIAppFonts`. Add new keys as `INFOPLIST_KEY_*` build settings where one exists. Keep both plists at the repo root: inside a synchronized folder they'd be copied as resources.
+- **Info.plists.** The app uses `GENERATE_INFOPLIST_FILE` and `INFOPLIST_FILE = Chopped-Info.plist` together. They merge, and the plist only holds `UIAppFonts`. Add new keys as `INFOPLIST_KEY_*` build settings where one exists. Keep both plists at the repo root: inside a synchronized folder they'd be copied as resources.
 - **App settings.** Display name is `Chopped` (app and widget extension). `UIUserInterfaceStyle = Dark` is set, plus `.preferredColorScheme(.dark)`.
 - **Font files are flat.** They're copied into the bundle root. The `UIAppFonts` entries are bare filenames.
 - **Ref PNGs are Display P3.** `design/refs/*.png` carry a "Display P3 Gamut with sRGB Transfer" ICC profile, so the raw
@@ -378,6 +378,6 @@ those were changed. The rich graphics were kept except where they contradicted e
 - **Glass.** Use `GlassSurface(shape:)` (Shared/DesignSystem/GlassSurface.swift), not `.ultraThinMaterial`: the material's
   luminance curve lifts #0C0C0E by ~27 levels, so the glass read twice as bright as Paper's `blur + #FFFFFF17`.
 - **Sim snapshot colours.** Simulator snapshots render accents slightly lighter/desaturated compared with device snapshots. Judge colour on the device PNG.
-- **Live Activity state.** `PocusActivityAttributes.ContentState` gained optional `icon`, `periodBase`, `goalMinutes` and `period`. For the lock screen and DI: "22:49 / 25:00" = `periodBase` + elapsed since `start`.
+- **Live Activity state.** `ChoppedActivityAttributes.ContentState` gained optional `icon`, `periodBase`, `goalMinutes` and `period`. For the lock screen and DI: "22:49 / 25:00" = `periodBase` + elapsed since `start`.
 - **Font metrics.** `TypeStyle` reads the natural line height from `UIFont`. If a font ever fails to register, the text falls back to the system font and spacing drifts. Check `missingFonts=[]` in the log.
 - **Tracker card layout.** The `GlyphView` size is the SVG box width. In `TrackerBezel` the inner block stretches to full width, and you supply its padding.

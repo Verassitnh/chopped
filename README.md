@@ -1,8 +1,6 @@
 # Chopped: Time Tracker
 
-A minimal iOS time tracker. Clock in to what matters, see where the week went, and keep your streaks alive from the Lock Screen, the Dynamic Island and home-screen widgets.
-
-> The Xcode project and targets still use the original name **Pocus**. The app ships as **Chopped**.
+**Chopped: Time Tracker** is a minimal iOS time tracker. Clock in to what matters, see where the week went, and keep your streaks alive from the Lock Screen, the Dynamic Island and home-screen widgets.
 
 <p align="center">
   <img src="docs/screenshots/01-home.png" width="260" alt="Home">
@@ -41,8 +39,8 @@ The shipped app uses the standard iOS Liquid Glass tab bar instead of the custom
 
 | Path | What |
 |---|---|
-| `Pocus/` | App: entry point, router, `Store` (SQLite), screens in `Pocus/Screens/`, QC harness in `Pocus/QC/` |
-| `PocusWidgets/` | Widget extension: home-screen widgets, Live Activity / Dynamic Island, Control Center controls |
+| `Chopped/` | App: entry point, router, `Store` (SQLite), screens in `Chopped/Screens/`, QC harness in `Chopped/QC/` |
+| `ChoppedWidgets/` | Widget extension: home-screen widgets, Live Activity / Dynamic Island, Control Center controls |
 | `Shared/` | Code shared by both targets: design system, fonts, App Group data access, App Intents, widget/activity views |
 | `design/` | Build spec (`SPEC.md`), API reference (`FOUNDATION.md`), reference renders, design and demo-data generators |
 | `docs/screenshots/` | Images used in this README |
@@ -52,17 +50,19 @@ The shipped app uses the standard iOS Liquid Glass tab bar instead of the custom
 Requirements: Xcode 27, iOS 17+ (Control Center controls need iOS 18+).
 
 ```sh
-open Pocus.xcodeproj
+open Chopped.xcodeproj
 ```
 
-Select the **Pocus** scheme and run it on a device or simulator. Device builds need a signing team that has the App Group `group.com.jackson.Pocus`.
+Select the **Chopped** scheme and run it on a device or simulator. Bundle IDs are `com.jackson.chopped` (app) and `com.jackson.chopped.widgets` (widget extension). Device builds need a signing team that has the App Group `group.com.jackson.chopped`.
+
+Both targets also list the App Group `group.com.jackson.Pocus`, used by the app when it was called Pocus (`com.jackson.Pocus`). On first launch, if the new group has no database yet, the app copies `pocus.sqlite` from the old group to `chopped.sqlite` in the new one. It never changes or deletes the old copy.
 
 ### Design QC mode
 
 Launch arguments render any screen with deterministic demo data that matches the designs, and save a snapshot:
 
 ```sh
-xcrun simctl launch <sim> com.jackson.Pocus -QCDemo -QCScreen home -QCSnapshot
+xcrun simctl launch <sim> com.jackson.chopped -QCDemo -QCScreen home -QCSnapshot
 # screens: home | detail | newTracker | stats | trackerStats | widgets | liveActivity | island
 # add -QCFullPage for full scroll height
 ```

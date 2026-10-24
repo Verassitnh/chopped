@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Live Activity for the running clock-in. Everything lives in ContentState so switching
 /// activities updates the existing Live Activity instead of starting a new one.
-struct PocusActivityAttributes: ActivityAttributes {
+struct ChoppedActivityAttributes: ActivityAttributes {
     struct ContentState: Codable, Hashable {
         var name: String
         var colorHex: String
@@ -19,7 +19,7 @@ struct PocusActivityAttributes: ActivityAttributes {
     }
 }
 
-extension PocusActivityAttributes.ContentState {
+extension ChoppedActivityAttributes.ContentState {
     var color: TrackerColor { TrackerColor.forHex(colorHex) }
     var glyph: Glyph { Glyph.tracker(icon) }
     var goalPeriod: GoalPeriod { period.flatMap(GoalPeriod.init(rawValue:)) ?? .week }

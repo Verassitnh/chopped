@@ -25,7 +25,7 @@ enum ChoppedSync {
     }
 
     /// Darwin notification posted by the widget extension after it changed the database.
-    static let changedNotification = "com.jackson.Pocus.dataChanged"
+    static let changedNotification = "com.jackson.chopped.dataChanged"
 
     /// App: calls `handler` on the main queue whenever the widget extension changes the database.
     @MainActor static func observeExtensionChanges(_ handler: @escaping @MainActor () -> Void) {
@@ -48,10 +48,10 @@ enum ChoppedSync {
 
 /// Starts / updates / ends the single clock-in Live Activity.
 enum LiveActivityBridge {
-    private typealias ClockIn = ActivityKit.Activity<PocusActivityAttributes>
+    private typealias ClockIn = ActivityKit.Activity<ChoppedActivityAttributes>
 
     /// App process only (the widget extension can't see the app's activities).
-    static func sync(_ state: PocusActivityAttributes.ContentState?) {
+    static func sync(_ state: ChoppedActivityAttributes.ContentState?) {
         let enabled = ActivityAuthorizationInfo().areActivitiesEnabled
         if AppGroup.defaults?.object(forKey: AppGroup.liveActivitiesEnabledKey) as? Bool != enabled {
             AppGroup.defaults?.set(enabled, forKey: AppGroup.liveActivitiesEnabledKey)
@@ -77,7 +77,7 @@ enum LiveActivityBridge {
             }
         } else if enabled {
             do {
-                _ = try ClockIn.request(attributes: PocusActivityAttributes(), content: content)
+                _ = try ClockIn.request(attributes: ChoppedActivityAttributes(), content: content)
             } catch {
                 NSLog("Chopped live activity request failed: \(error)")
             }

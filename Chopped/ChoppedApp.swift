@@ -2,7 +2,7 @@ import SwiftUI
 import UIKit
 
 @main
-struct PocusApp: App {
+struct ChoppedApp: App {
     @State private var store: Store
     @State private var router = AppRouter()
     @Environment(\.scenePhase) private var scenePhase

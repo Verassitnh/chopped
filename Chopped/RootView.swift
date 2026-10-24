@@ -2,7 +2,7 @@ import SwiftUI
 import UIKit
 
 /// Top level: Track / Stats in a standard (Liquid Glass) tab bar, plus the app's sheets.
-/// Screens live in Pocus/Screens/*.swift; navigation state lives in `AppRouter`.
+/// Screens live in Chopped/Screens/*.swift; navigation state lives in `AppRouter`.
 struct RootView: View {
     @Environment(Store.self) private var store
     @Environment(AppRouter.self) private var router
