@@ -2,7 +2,8 @@ import AppIntents
 import Foundation
 
 // Compiled into both the app and the widget extension. `LiveActivityIntent`s run in the app's
-// process (launched in the background if needed), so they can start/end the Live Activity.
+// process (launched in the background if needed), so they can start/end the Live Activity. Home-screen
+// widget buttons use the plain `Widget…Intent`s instead, which run in the extension and flip instantly.
 
 // MARK: - Entity
 
@@ -66,6 +67,43 @@ struct StopTrackerIntent: LiveActivityIntent {
     static var title: LocalizedStringResource = "Stop Tracker"
     static var description = IntentDescription("Clock out of the running tracker.")
     static var openAppWhenRun = false
+
+    init() {}
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        ChoppedData.stop()
+        ChoppedSync.didChange()
+        return .result()
+    }
+}
+
+/// Home-screen widget Play. A plain `AppIntent` (not a `LiveActivityIntent`), so the system runs it in the
+/// widget extension and re-renders the tapped widget as soon as `perform()` returns, without waiting for a
+/// background launch of the app. The Live Activity / app catch up through `ChoppedSync.didChange()`.
+struct WidgetStartTrackerIntent: AppIntent {
+    static var title: LocalizedStringResource = "Start Tracker"
+    static var openAppWhenRun = false
+    static var isDiscoverable = false
+
+    @Parameter(title: "Tracker ID") var trackerID: Int
+
+    init() {}
+    init(trackerID: Int64) { self.trackerID = Int(trackerID) }
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        ChoppedData.start(Int64(trackerID))
+        ChoppedSync.didChange()
+        return .result()
+    }
+}
+
+/// Home-screen widget Stop (see `WidgetStartTrackerIntent`).
+struct WidgetStopTrackerIntent: AppIntent {
+    static var title: LocalizedStringResource = "Stop Tracker"
+    static var openAppWhenRun = false
+    static var isDiscoverable = false
 
     init() {}
 

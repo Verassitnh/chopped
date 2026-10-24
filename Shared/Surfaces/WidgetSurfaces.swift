@@ -44,13 +44,14 @@ struct MediumWidgetView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             if let start = t.runningStart {
                 LiveTimerText(start: start, style: .compact, now: now)
+                    .invalidatableContent()
                     .geistPixel(34)
                     .foregroundStyle(CH.onAccent)
                     .multilineTextAlignment(.trailing)
                     .lineLimit(1)
                     .frame(maxWidth: 130, alignment: .trailing)
                     .fixedSize(horizontal: AppClock.isFrozen, vertical: false)
-                IntentButton(intent: StopTrackerIntent(), accessibility: "Stop \(t.name)") {
+                IntentButton(intent: WidgetStopTrackerIntent(), accessibility: "Stop \(t.name)") {
                     SurfaceStopGlyph(size: 36, accent: t.color.accent)
                 }
             } else {
@@ -58,7 +59,7 @@ struct MediumWidgetView: View {
                     .geistMono(26, .medium, tracking: -0.05, lineHeight: 30)
                     .foregroundStyle(CH.onAccent)
                     .numericMorph()
-                IntentButton(intent: StartTrackerIntent(trackerID: t.id), accessibility: "Start \(t.name)") {
+                IntentButton(intent: WidgetStartTrackerIntent(trackerID: t.id), accessibility: "Start \(t.name)") {
                     PlayButton(size: 36)
                 }
             }
@@ -80,7 +81,7 @@ struct MediumWidgetView: View {
                 .geistMono(14, .medium, tracking: -0.02, lineHeight: 18)
                 .foregroundStyle(CH.textMuted)
                 .numericMorph()
-            IntentButton(intent: StartTrackerIntent(trackerID: t.id), accessibility: "Start \(t.name)") {
+            IntentButton(intent: WidgetStartTrackerIntent(trackerID: t.id), accessibility: "Start \(t.name)") {
                 PlayButton(size: 26, background: Color.white.opacity(0.1))
             }
         }
@@ -103,11 +104,11 @@ struct SmallWidgetView: View {
                     IconTile(glyph: t.glyph, size: 26, radius: 8, glyphSize: 14)
                     Spacer(minLength: 0)
                     if t.isRunning {
-                        IntentButton(intent: StopTrackerIntent(), accessibility: "Stop \(t.name)") {
+                        IntentButton(intent: WidgetStopTrackerIntent(), accessibility: "Stop \(t.name)") {
                             SurfaceStopGlyph(size: 34, accent: accent)
                         }
                     } else {
-                        IntentButton(intent: StartTrackerIntent(trackerID: t.id), accessibility: "Start \(t.name)") {
+                        IntentButton(intent: WidgetStartTrackerIntent(trackerID: t.id), accessibility: "Start \(t.name)") {
                             PlayButton(size: 34)
                         }
                     }
@@ -120,6 +121,7 @@ struct SmallWidgetView: View {
                         .lineLimit(1)
                     if let start = t.runningStart {
                         LiveTimerText(start: start, style: .compact, now: now)
+                    .invalidatableContent()
                             .geistPixel(40)
                             .foregroundStyle(CH.onAccent)
                             .lineLimit(1)

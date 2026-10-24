@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 @main
 struct PocusApp: App {
@@ -11,7 +12,14 @@ struct PocusApp: App {
         let store = QC.makeStore()
         _store = State(initialValue: store)
         // Intents (widgets, Live Activity, controls) write the shared DB; reload the in-memory store after.
-        if !QC.demo { ChoppedSync.appRefresh = { store.refresh() } }
+        if !QC.demo {
+            ChoppedSync.appRefresh = { store.refresh() }
+            // Widget buttons run in the extension; re-read the DB when they change it. Silent (no haptic)
+            // unless the app is on screen.
+            ChoppedSync.observeExtensionChanges {
+                store.refresh(silent: UIApplication.shared.applicationState != .active)
+            }
+        }
         if let screen = QC.screen {
             let router = AppRouter()
             router.open(screen, store: store)
