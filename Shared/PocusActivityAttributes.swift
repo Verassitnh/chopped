@@ -14,5 +14,22 @@ struct PocusActivityAttributes: ActivityAttributes {
         var periodBase: TimeInterval? = nil
         var goalMinutes: Int? = nil
         var period: String? = nil
+        /// Running tracker's id (deep links / intents).
+        var trackerID: Int64? = nil
+    }
+}
+
+extension PocusActivityAttributes.ContentState {
+    var color: TrackerColor { TrackerColor.forHex(colorHex) }
+    var glyph: Glyph { Glyph.tracker(icon) }
+    var goalPeriod: GoalPeriod { period.flatMap(GoalPeriod.init(rawValue:)) ?? .week }
+
+    /// Logged in the current goal period at `now` ("22:49" of "22:49 / 25:00").
+    func periodTotal(at now: Date) -> TimeInterval { (periodBase ?? 0) + max(0, now.timeIntervalSince(start)) }
+
+    /// periodTotal / goal (strip fraction).
+    func progress(at now: Date) -> Double {
+        guard let g = goalMinutes, g > 0 else { return 0 }
+        return periodTotal(at: now) / TimeInterval(g * 60)
     }
 }

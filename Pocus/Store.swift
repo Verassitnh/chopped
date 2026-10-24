@@ -409,6 +409,9 @@ final class Store {
         syncLiveActivity()
     }
 
+    /// Re-reads the database (changes made by widgets / Control Center / Live Activity intents).
+    func refresh() { reload() }
+
     /// Also called when the app returns to the foreground, to restart a Live Activity the system ended.
     func syncLiveActivity() {
         guard liveActivities else { return }

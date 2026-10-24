@@ -43,11 +43,8 @@ final class Database {
 
     deinit { sqlite3_close(db) }
 
-    static var defaultURL: URL {
-        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appendingPathComponent("pocus.sqlite")
-    }
+    /// Shared App Group location (migrated once from Application Support — see `ChoppedDB`).
+    static var defaultURL: URL { ChoppedDB.appURL }
 
     // MARK: Migrations (additive only — never drops data)
 

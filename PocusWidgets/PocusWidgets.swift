@@ -1,4 +1,5 @@
 import ActivityKit
+import AppIntents
 import SwiftUI
 import WidgetKit
 
@@ -6,80 +7,249 @@ import WidgetKit
 struct PocusWidgets: WidgetBundle {
     var body: some Widget {
         ClockInLiveActivity()
+        TrackersWidget()
+        TrackerWidget()
+        if #available(iOS 18.0, *) {
+            RunningControl()
+            TrackerControl()
+        }
     }
 }
+
+// MARK: - Live Activity + Dynamic Island
 
 struct ClockInLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: PocusActivityAttributes.self) { context in
-            LockScreenView(state: context.state)
-                .activityBackgroundTint(Color(hex: context.state.colorHex))
+            LockActivityView(state: context.state)
+                .activityBackgroundTint(context.state.color.tint)
                 .activitySystemActionForegroundColor(.white)
         } dynamicIsland: { context in
             let state = context.state
             return DynamicIsland {
-                DynamicIslandExpandedRegion(.leading) {
-                    ClockedInLabel(state: state)
+                DynamicIslandExpandedRegion(.leading, priority: 1) {
+                    IslandExpandedHeader(state: state)
                         .padding(.leading, 6)
+                        .dynamicIsland(verticalPlacement: .belowIfTooWide)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    Elapsed(start: state.start)
-                        .font(.title2.weight(.light))
+                    IslandStopButton(state: state)
                         .padding(.trailing, 6)
+                        .frame(maxHeight: .infinity)
+                }
+                DynamicIslandExpandedRegion(.bottom) {
+                    IslandExpandedFooter(state: state)
+                        .padding(.horizontal, 6)
+                        .padding(.top, 8)
                 }
             } compactLeading: {
-                Circle().fill(Color(hex: state.colorHex)).frame(width: 10, height: 10)
+                IslandIconTile(state: state)
             } compactTrailing: {
-                Elapsed(start: state.start)
-                    .font(.caption.weight(.semibold))
-                    .frame(width: 56)
+                IslandCompactTimer(state: state, isStale: context.isStale)
             } minimal: {
-                Circle().fill(Color(hex: state.colorHex)).frame(width: 10, height: 10)
+                IslandIconTile(state: state)
+            }
+            .keylineTint(state.color.accent)
+        }
+    }
+}
+
+// MARK: - Timeline
+
+struct ChoppedEntry: TimelineEntry {
+    let date: Date
+    let snapshot: ChoppedSnapshot?
+    /// Small widget: configured tracker id (nil = follow the running tracker).
+    var selectedID: Int64? = nil
+
+    /// The small widget's tracker: configured → running → first.
+    var smallTracker: TrackerSnapshot? {
+        guard let snapshot else { return nil }
+        return snapshot.tracker(selectedID) ?? snapshot.running ?? snapshot.trackers.first
+    }
+}
+
+enum ChoppedTimeline {
+    /// Entries every minute for an hour while something runs (totals/strips move), otherwise one entry
+    /// refreshed at the next period boundary (or in an hour).
+    static func entries(selectedID: Int64? = nil) -> Timeline<ChoppedEntry> {
+        let now = Date()
+        let snapshot = ChoppedData.snapshot(now: now)
+        guard let snapshot, snapshot.running != nil else {
+            let next = snapshot?.trackers.map(\.periodInterval.end).min().map { min($0, now.addingTimeInterval(3600)) }
+                ?? now.addingTimeInterval(3600)
+            return Timeline(entries: [ChoppedEntry(date: now, snapshot: snapshot, selectedID: selectedID)], policy: .after(next))
+        }
+        let minute = Calendar.current.dateInterval(of: .minute, for: now)?.start ?? now
+        let entries = (0..<60).map { i -> ChoppedEntry in
+            let date = i == 0 ? now : minute.addingTimeInterval(TimeInterval(i * 60))
+            return ChoppedEntry(date: date, snapshot: snapshot, selectedID: selectedID)
+        }
+        return Timeline(entries: entries, policy: .atEnd)
+    }
+
+    static var placeholder: ChoppedEntry {
+        let now = Date()
+        let week = Calendar.chopped.dateInterval(of: .weekOfYear, for: now)!
+        let day = Calendar.chopped.dateInterval(of: .day, for: now)!
+        func t(_ id: Int64, _ name: String, _ c: TrackerColor, _ icon: String, _ goal: Int, _ p: GoalPeriod,
+               _ logged: TimeInterval, running: Bool = false) -> TrackerSnapshot {
+            TrackerSnapshot(id: id, name: name, colorHex: c.accentHex, icon: icon, goalMinutes: goal, period: p,
+                            position: Int(id), periodInterval: p == .day ? day : week, periodLogged: logged,
+                            runningStart: running ? now.addingTimeInterval(-3001) : nil, lastUsed: nil)
+        }
+        let s = ChoppedSnapshot(date: now, trackers: [
+            t(1, "Deep Work", .blue, "target", 1500, .week, 79_140, running: true),
+            t(2, "Meetings", .orange, "people", 480, .week, 19_440),
+            t(3, "Exercise", .teal, "pulse", 45, .day, 1_800),
+            t(4, "Email", .purple, "mail", 30, .day, 1_620),
+        ])
+        return ChoppedEntry(date: now, snapshot: s)
+    }
+}
+
+struct TrackersProvider: TimelineProvider {
+    func placeholder(in context: Context) -> ChoppedEntry { ChoppedTimeline.placeholder }
+    func getSnapshot(in context: Context, completion: @escaping (ChoppedEntry) -> Void) {
+        let live = ChoppedEntry(date: Date(), snapshot: ChoppedData.snapshot())
+        completion(context.isPreview && (live.snapshot?.trackers.isEmpty ?? true) ? ChoppedTimeline.placeholder : live)
+    }
+    func getTimeline(in context: Context, completion: @escaping (Timeline<ChoppedEntry>) -> Void) {
+        completion(ChoppedTimeline.entries())
+    }
+}
+
+struct TrackerProvider: AppIntentTimelineProvider {
+    func placeholder(in context: Context) -> ChoppedEntry { ChoppedTimeline.placeholder }
+    func snapshot(for configuration: SelectTrackerIntent, in context: Context) async -> ChoppedEntry {
+        let live = ChoppedEntry(date: Date(), snapshot: ChoppedData.snapshot(), selectedID: configuration.tracker.map { Int64($0.id) })
+        return context.isPreview && live.smallTracker == nil ? ChoppedTimeline.placeholder : live
+    }
+    func timeline(for configuration: SelectTrackerIntent, in context: Context) async -> Timeline<ChoppedEntry> {
+        ChoppedTimeline.entries(selectedID: configuration.tracker.map { Int64($0.id) })
+    }
+}
+
+// MARK: - Home-screen widgets
+
+struct TrackersWidget: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: "ChoppedTrackers", provider: TrackersProvider()) { entry in
+            Group {
+                if let snapshot = entry.snapshot, !snapshot.trackers.isEmpty {
+                    MediumWidgetView(snapshot: snapshot, now: entry.date)
+                } else {
+                    EmptyWidgetView()
+                }
+            }
+            .containerBackground(MediumWidgetView.background, for: .widget)
+        }
+        .configurationDisplayName("Trackers")
+        .description("Your running tracker and quick starts.")
+        .supportedFamilies([.systemMedium])
+        .contentMarginsDisabled()
+    }
+}
+
+struct TrackerWidget: Widget {
+    var body: some WidgetConfiguration {
+        AppIntentConfiguration(kind: "ChoppedTracker", intent: SelectTrackerIntent.self, provider: TrackerProvider()) { entry in
+            if let t = entry.smallTracker {
+                SmallWidgetView(tracker: t, now: entry.date)
+                    .containerBackground(t.color.tint, for: .widget)
+            } else {
+                EmptyWidgetView()
+                    .containerBackground(CH.raised, for: .widget)
             }
         }
+        .configurationDisplayName("Tracker")
+        .description("Start, stop and follow one tracker.")
+        .supportedFamilies([.systemSmall])
+        .contentMarginsDisabled()
     }
 }
 
-/// Mirrors the active card: name, white dot + "Clocked in", running time on the right.
-private struct LockScreenView: View {
-    let state: PocusActivityAttributes.ContentState
+// MARK: - Control Center (iOS 18)
 
-    var body: some View {
-        HStack {
-            ClockedInLabel(state: state)
-            Spacer()
-            Elapsed(start: state.start)
-                .font(.system(size: 40, weight: .light))
+/// SF Symbol stand-ins for the tracker glyphs (controls only render symbols).
+func controlSymbol(_ icon: String) -> String {
+    switch Glyph.tracker(icon) {
+    case .people: "person.2"
+    case .pulse: "waveform.path.ecg"
+    case .mail: "envelope"
+    case .book: "book"
+    case .music: "music.note"
+    default: "target"
+    }
+}
+
+@available(iOS 18.0, *)
+struct RunningControl: ControlWidget {
+    struct Value {
+        var isRunning: Bool
+        var name: String
+        var colorHex: String
+    }
+
+    struct Provider: ControlValueProvider {
+        var previewValue: Value { Value(isRunning: true, name: "Deep Work", colorHex: TrackerColor.blue.accentHex) }
+        func currentValue() async throws -> Value {
+            let s = ChoppedData.snapshot()
+            let t = s?.running ?? s?.lastUsed
+            return Value(isRunning: s?.running != nil, name: t?.name ?? "Chopped", colorHex: t?.colorHex ?? TrackerColor.blue.accentHex)
         }
-        .padding(16)
-        .foregroundStyle(.white)
     }
-}
 
-private struct ClockedInLabel: View {
-    let state: PocusActivityAttributes.ContentState
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(state.name)
-                .font(.title3.bold())
-                .lineLimit(1)
-            HStack(spacing: 6) {
-                Circle().fill(.white).frame(width: 7, height: 7)
-                Text("Clocked in")
+    var body: some ControlWidgetConfiguration {
+        StaticControlConfiguration(kind: "ChoppedRunningControl", provider: Provider()) { value in
+            ControlWidgetToggle(value.name, isOn: value.isRunning, action: SetAnyRunningIntent()) { on in
+                Label(on ? "Running" : "Stopped", systemImage: on ? "stop.fill" : "play.fill")
             }
-            .font(.subheadline.weight(.semibold))
+            .tint(Color(hex: value.colorHex))
         }
+        .displayName("Running Tracker")
+        .description("Stop the running tracker, or resume the last one.")
     }
 }
 
-/// Counts up from `start`; the system renders it live without app updates.
-private struct Elapsed: View {
-    let start: Date
+@available(iOS 18.0, *)
+struct SelectTrackerControlIntent: ControlConfigurationIntent {
+    static var title: LocalizedStringResource = "Tracker"
+    @Parameter(title: "Tracker") var tracker: TrackerEntity?
+    init() {}
+}
 
-    var body: some View {
-        Text(timerInterval: start...start.addingTimeInterval(24 * 3600), countsDown: false)
-            .monospacedDigit()
-            .multilineTextAlignment(.trailing)
+@available(iOS 18.0, *)
+struct TrackerControl: ControlWidget {
+    struct Value {
+        var tracker: TrackerEntity?
+        var isRunning: Bool
+    }
+
+    struct Provider: AppIntentControlValueProvider {
+        func previewValue(configuration: SelectTrackerControlIntent) -> Value {
+            Value(tracker: configuration.tracker ?? TrackerEntity(id: 0, name: "Exercise", colorHex: TrackerColor.teal.accentHex, icon: "pulse"),
+                  isRunning: false)
+        }
+        func currentValue(configuration: SelectTrackerControlIntent) async throws -> Value {
+            let s = ChoppedData.snapshot()
+            let entity = configuration.tracker ?? s?.trackers.first.map(TrackerEntity.init)
+            let running = entity.map { e in s?.running?.id == Int64(e.id) } ?? false
+            return Value(tracker: entity, isRunning: running)
+        }
+    }
+
+    var body: some ControlWidgetConfiguration {
+        AppIntentControlConfiguration(kind: "ChoppedTrackerControl", provider: Provider()) { value in
+            ControlWidgetToggle(value.tracker?.name ?? "Tracker", isOn: value.isRunning,
+                                action: SetTrackerRunningIntent(tracker: value.tracker)) { on in
+                Label(on ? "Running" : "Start",
+                      systemImage: on ? "stop.fill" : controlSymbol(value.tracker?.icon ?? "target"))
+            }
+            .tint(Color(hex: value.tracker?.colorHex ?? TrackerColor.blue.accentHex))
+        }
+        .displayName("Start Tracker")
+        .description("Start or stop a specific tracker.")
+        .promptsForUserConfiguration()
     }
 }
