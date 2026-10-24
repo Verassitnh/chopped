@@ -117,6 +117,17 @@ final class Store {
     /// All sessions, newest first.
     private(set) var sessions: [WorkSession] = []
 
+    /// A timer started or stopped (in the app, or by an intent while the app is up). Drives the
+    /// start/stop haptic, so it changes exactly once per clock change. Not set by the initial load or
+    /// the silent foreground refresh (changes made while the app was away don't buzz on return).
+    struct ClockEvent: Equatable {
+        enum Kind { case start, stop }
+        let kind: Kind
+        let serial: Int
+    }
+    private(set) var clockEvent: ClockEvent?
+    private var loaded = false
+
     /// Monday-first calendar used for every bucket.
     var calendar: Calendar { .chopped }
 
@@ -402,7 +413,8 @@ final class Store {
 
     // MARK: Loading
 
-    private func reload() {
+    private func reload(silent: Bool = false) {
+        let wasRunning = activeSession?.id
         activities = db.query("SELECT id, name, color, position, icon, goal_minutes, period FROM activities ORDER BY position, id") {
             Activity(id: $0.int(0), name: $0.text(1), colorHex: $0.text(2), position: Int($0.int(3)),
                      icon: $0.text(4), goalMinutes: Int($0.int(5)), period: GoalPeriod(rawValue: $0.text(6)) ?? .week)
@@ -410,11 +422,17 @@ final class Store {
         sessions = db.query("SELECT id, activity_id, start, end FROM sessions ORDER BY start DESC") {
             WorkSession(id: $0.int(0), activityID: $0.int(1), start: $0.date(2)!, end: $0.date(3))
         }
+        let isRunning = activeSession?.id
+        if loaded, !silent, isRunning != wasRunning {
+            clockEvent = ClockEvent(kind: isRunning == nil ? .stop : .start, serial: (clockEvent?.serial ?? 0) + 1)
+        }
+        loaded = true
         syncLiveActivity()
     }
 
     /// Re-reads the database (changes made by widgets / Control Center / Live Activity intents).
-    func refresh() { reload() }
+    /// `silent`: don't emit a `clockEvent` (foreground refresh after changes made while away).
+    func refresh(silent: Bool = false) { reload(silent: silent) }
 
     /// Also called when the app returns to the foreground, to restart a Live Activity the system ended.
     func syncLiveActivity() {

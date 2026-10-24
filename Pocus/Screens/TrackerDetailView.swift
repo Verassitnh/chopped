@@ -282,7 +282,7 @@ private struct DetailHeader: View {
                     .frame(maxWidth: .infinity, minHeight: 44, maxHeight: 44, alignment: .leading)
                     .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressScaleStyle(scale: 0.98))
                 .accessibilityHint("Edit tracker")
                 CircleIconButton(glyph: .close, size: 36, glyphSize: 14,
                                  background: Color.black.opacity(0.12), foreground: .black, action: close)

@@ -185,7 +185,7 @@ private struct StatsHeader: View {
                             }
                             .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.pressScale)
                     .accessibilityAddTraits(selected ? .isSelected : [])
                 }
             }

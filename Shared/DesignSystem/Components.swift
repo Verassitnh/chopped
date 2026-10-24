@@ -9,7 +9,8 @@ enum Motion {
     static let grow = Animation.easeOut(duration: 0.45)
 }
 
-/// Press feedback used by every tappable control: scale 0.96 (disabled under Reduce Motion).
+/// Press feedback used by every tappable control: scale 0.96 (0.98 for large cards) on press-down,
+/// released on lift with a quick spring. No scale under Reduce Motion.
 struct PressScaleStyle: ButtonStyle {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var scale: CGFloat = 0.96
@@ -17,7 +18,7 @@ struct PressScaleStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed && !reduceMotion ? scale : 1)
-            .animation(.spring(response: 0.25, dampingFraction: 0.8), value: configuration.isPressed)
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
     }
 }
 
