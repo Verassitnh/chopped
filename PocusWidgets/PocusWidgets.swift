@@ -21,14 +21,14 @@ struct PocusWidgets: WidgetBundle {
 struct ClockInLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: PocusActivityAttributes.self) { context in
-            LockActivityView(state: context.state)
+            LockActivityView(state: context.state, isStale: context.isStale)
                 .activityBackgroundTint(context.state.color.tint)
                 .activitySystemActionForegroundColor(.white)
         } dynamicIsland: { context in
             let state = context.state
             return DynamicIsland {
                 DynamicIslandExpandedRegion(.leading, priority: 1) {
-                    IslandExpandedHeader(state: state)
+                    IslandExpandedHeader(state: state, isStale: context.isStale)
                         .padding(.leading, 6)
                         .dynamicIsland(verticalPlacement: .belowIfTooWide)
                 }
@@ -81,9 +81,15 @@ enum ChoppedTimeline {
             return Timeline(entries: [ChoppedEntry(date: now, snapshot: snapshot, selectedID: selectedID)], policy: .after(next))
         }
         let minute = Calendar.current.dateInterval(of: .minute, for: now)?.start ?? now
-        let entries = (0..<60).map { i -> ChoppedEntry in
+        var entries = (0..<60).map { i -> ChoppedEntry in
             let date = i == 0 ? now : minute.addingTimeInterval(TimeInterval(i * 60))
             return ChoppedEntry(date: date, snapshot: snapshot, selectedID: selectedID)
+        }
+        // An entry exactly at the 1h mark, where the live timer switches "59:59" → "1:00:00" (LiveTimerText).
+        if let hourMark = snapshot.running?.runningStart?.addingTimeInterval(3600),
+           hourMark > now, let last = entries.last?.date, hourMark < last {
+            entries.append(ChoppedEntry(date: hourMark, snapshot: snapshot, selectedID: selectedID))
+            entries.sort { $0.date < $1.date }
         }
         return Timeline(entries: entries, policy: .atEnd)
     }

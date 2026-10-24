@@ -9,12 +9,14 @@ typealias ClockInState = PocusActivityAttributes.ContentState
 struct LockActivityView: View {
     let state: ClockInState
     var now: Date = AppClock.now
+    /// The activity's staleDate (start + 1h) passed → the timer has gained an hour field.
+    var isStale = false
 
     var body: some View {
         let color = state.color
         TrackerBezel(color: color) {
             HStack(spacing: 12) {
-                LiveTimerText(start: state.start, style: .hms, now: now)
+                LiveTimerText(start: state.start, style: .hms, now: now, pastHour: isStale)
                     .geistPixel(68)
                     .foregroundStyle(CH.onAccent)
                     .lineLimit(1)
@@ -55,7 +57,7 @@ struct IslandCompactTimer: View {
     }
 
     var body: some View {
-        LiveTimerText(start: state.start, style: .compact, now: now)
+        LiveTimerText(start: state.start, style: .compact, now: now, pastHour: isStale)
             .geistMono(15, .semibold, tracking: -0.02, lineHeight: 19)
             .foregroundStyle(state.color.accent)
             .multilineTextAlignment(.trailing)
@@ -68,6 +70,8 @@ struct IslandCompactTimer: View {
 struct IslandExpandedHeader: View {
     let state: ClockInState
     var now: Date = AppClock.now
+    /// The activity's staleDate (start + 1h) passed → the timer has gained an hour field.
+    var isStale = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -78,7 +82,7 @@ struct IslandExpandedHeader: View {
                     .geist(14, .semibold, lineHeight: 18)
                     .foregroundStyle(CH.textMuted)
                     .lineLimit(1)
-                LiveTimerText(start: state.start, style: .hms, now: now)
+                LiveTimerText(start: state.start, style: .hms, now: now, pastHour: isStale)
                     .geistPixel(44)
                     .foregroundStyle(.white)
                     .lineLimit(1)

@@ -174,7 +174,7 @@ Never call `Date()` or `.now` in app code. Use `AppClock.now`, which is frozen i
 Ticker(every: 1) { now in Text(Fmt.hms(now.timeIntervalSince(session.start))) }
 ```
 
-`Ticker` wraps `TimelineView`. When the clock is frozen it renders once with the frozen time. In widgets/Live Activities, use `Text(timerInterval:)` for live counting.
+`Ticker` wraps `TimelineView`. When the clock is frozen it renders once with the frozen time. In widgets/Live Activities, use `LiveTimerText` for live counting. It uses the iOS 18 `.stopwatch`/`.timer` format styles (zero-padded, matching `Fmt.hms`/`Fmt.compact`) and falls back to `Text(timerInterval:)` on iOS 17. Plain `Text(timerInterval:)` / `.timer` drop leading zeros ("0:15").
 
 ## Data model
 
