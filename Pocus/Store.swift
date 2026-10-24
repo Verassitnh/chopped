@@ -73,10 +73,21 @@ struct Streak: Hashable {
 /// Day bucket for the consistency heatmap.
 struct DayScore: Hashable, Identifiable {
     let day: DateInterval
-    /// Mean over trackers of min(1, dayTotal / dailyShareOfGoal). 1 = perfect day.
+    /// min(1, time logged that day on all trackers ÷ the day's target), where the target is the sum of every
+    /// tracker's goal pro-rated to one day (`dailyShare`). 1 = perfect day ("put in a full day's worth").
     let score: Double
     var isPerfect: Bool { score >= 0.999 }
     var id: Date { day.start }
+
+    /// Heatmap level: 0 under 1/8 of the target (~48 min with the default goals), 1 under 1/4,
+    /// 2 under the full target, 3 = perfect.
+    static func level(_ score: Double) -> Int {
+        if score >= 0.999 { return 3 }
+        if score >= 0.25 { return 2 }
+        if score >= 0.125 { return 1 }
+        return 0
+    }
+    var level: Int { DayScore.level(score) }
 }
 
 /// Sessions of one tracker on one day (detail "Entries").
@@ -200,11 +211,15 @@ final class Store {
         max(0, activity.goal - periodTotal(for: activity, now: now))
     }
 
-    /// On pace = logged ≥ goal × elapsed fraction of the period. ("4/5 on pace")
+    /// On pace = logged ≥ goal × (whole days already finished ÷ days in the period). ("4/5 on pace")
+    /// Today isn't held against you until it's over, so a weekly goal is judged against Mon…yesterday and a
+    /// daily goal is on pace until the day ends (it then shows as a hit or a miss in the streak/dots).
     func isOnPace(_ activity: Activity, now: Date) -> Bool {
         let p = currentPeriod(for: activity, now: now)
-        let elapsed = now.timeIntervalSince(p.start) / p.duration
-        return periodTotal(for: activity, now: now) >= activity.goal * elapsed
+        let today = Store.day(containing: now).start
+        let done = Double(calendar.dateComponents([.day], from: p.start, to: today).day ?? 0)
+        let total = max(1, (p.duration / 86_400).rounded())
+        return periodTotal(for: activity, now: now) >= activity.goal * done / total
     }
 
     /// Per-day totals over `interval` (one entry per day, oldest first). Single pass over sessions.
@@ -289,14 +304,10 @@ final class Store {
     func dayScores(days count: Int, now: Date) -> [DayScore] {
         let today = Store.day(containing: now)
         let range = DateInterval(start: calendar.date(byAdding: .day, value: -(count - 1), to: today.start)!, end: today.end)
-        let perTracker = activities.map { ($0, dailyTotals(for: $0.id, in: range, now: now)) }
+        let logged = dailyTotals(in: range, now: now)
         return days(in: range).enumerated().map { i, day in
-            guard !perTracker.isEmpty else { return DayScore(day: day, score: 0) }
-            let sum = perTracker.reduce(0.0) { acc, pair in
-                let share = dailyShare(of: pair.0, on: day.start)
-                return acc + (share > 0 ? min(1, pair.1[i].seconds / share) : 1)
-            }
-            return DayScore(day: day, score: sum / Double(perTracker.count))
+            let target = activities.reduce(0.0) { $0 + dailyShare(of: $1, on: day.start) }
+            return DayScore(day: day, score: target > 0 ? min(1, logged[i].seconds / target) : 0)
         }
     }
 

@@ -288,7 +288,10 @@ private struct HoursByTracker: View {
                 head("TRACKER").frame(maxWidth: .infinity, alignment: .leading)
                 head("NOW").frame(width: 60, alignment: .trailing)
                 head("LAST").frame(width: 56, alignment: .trailing)
-                head("Δ").frame(width: 58, alignment: .trailing)
+                // Geist Mono has no Δ; Paper falls back to the system font (SF), so render it in SF explicitly,
+                // with the CSS letter-spacing (0.08em) trailing it like the other header labels.
+                Text("Δ").font(.system(size: 9, weight: .medium)).tracking(0.72).padding(.trailing, 0.67).foregroundStyle(StatsColor.dim)
+                    .frame(height: 13).frame(width: 58, alignment: .trailing)
             }
             .padding(.bottom, 8)
             .overlay(alignment: .bottom) { CH.raised.frame(height: 1).offset(y: 1) }
@@ -499,6 +502,7 @@ private struct GoalPercentChart: View {
             .map { ($0, store.total(for: $0.id, in: thisWeek, now: now)) }
             .sorted { $0.1 > $1.1 }
             .prefix(3)
+            .sorted { store.weekFraction(for: $0.0, week: thisWeek, now: now) > store.weekFraction(for: $1.0, week: thisWeek, now: now) }
             .map { a, _ in
                 Line(activity: a, values: weeks.enumerated().map { i, wk in
                     if i == weeks.count - 1, a.period == .day || a.period == .week { return store.progress(for: a, now: now) }
@@ -520,7 +524,7 @@ private struct GoalPercentChart: View {
                                 style: StrokeStyle(lineWidth: 1, dash: strong ? [4, 4] : [2, 4]))
                     axisText("\(Int(p * 100))%").svgPlaced(x: width - 32, baseline: y + 4)
                 }
-                ForEach(lines.filter { $0.id != best?.id }) { l in
+                ForEach(lines.filter { $0.id != best?.id }.reversed()) { l in
                     curve(l.values, xs: xs).trim(from: 0, to: grown ? 1 : 0)
                         .stroke(l.activity.color.accent.opacity(0.7), style: StrokeStyle(lineWidth: 1.6, lineCap: .round))
                         .animation(.easeOut(duration: 0.5).delay(0.05), value: grown)
@@ -640,10 +644,12 @@ private struct ConsistencyHeatmap: View {
     }
 
     private func color(_ score: Double) -> Color {
-        if score >= 0.999 { return CH.up }
-        if score >= 0.5 { return StatsColor.heatMid }
-        if score > 0 { return StatsColor.heatLow }
-        return StatsColor.track
+        switch DayScore.level(score) {
+        case 3: CH.up
+        case 2: StatsColor.heatMid
+        case 1: StatsColor.heatLow
+        default: StatsColor.track
+        }
     }
 }
 
@@ -661,17 +667,19 @@ private struct StreakLanes: View {
     }
 
     var body: some View {
+        // Every lane shares one axis: the 12 calendar weeks ending with this one (Mon → Sun, 84 day slots).
+        // Daily lanes run from that Monday through today; weekly lanes have one slot per week.
+        let start = store.intervals(.week, count: 12, endingAt: now)[0].start
+        let elapsedDays = (Calendar.chopped.dateComponents([.day], from: start, to: Store.day(containing: now).start).day ?? 0) + 1
         let lanes = store.activities
-            .map { a in Lane(activity: a, series: store.goalSeries(for: a, count: a.period == .day ? 84 : 12, now: now)) }
+            .map { a in Lane(activity: a, series: store.goalSeries(for: a, count: a.period == .day ? elapsedDays : 12, now: now)) }
             .enumerated()
             .sorted { l, r in
                 let ld = l.element.activity.period == .day, rd = r.element.activity.period == .day
                 if ld != rd { return ld }
-                if l.element.series.best != r.element.series.best { return l.element.series.best > r.element.series.best }
                 return l.offset < r.offset
             }
             .map(\.element)
-        let start = Calendar.chopped.date(byAdding: .day, value: -83, to: Store.day(containing: now).start)!
         let trackX: CGFloat = 78
         let trackW = max(0, width - 112)
 
@@ -689,7 +697,7 @@ private struct StreakLanes: View {
             VStack(spacing: 0) {
                 ForEach(Array(lanes.enumerated()), id: \.element.id) { li, lane in
                     let accent = lane.activity.color.accent
-                    let unit = trackW / CGFloat(max(1, lane.series.results.count))
+                    let unit = trackW / (lane.series.unit == "d" ? 84 : 12)
                     let runs = lane.series.runs
                     let bestRun = runs.enumerated().max { a, b in
                         a.element.count != b.element.count ? a.element.count < b.element.count : a.offset < b.offset

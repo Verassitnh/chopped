@@ -174,8 +174,8 @@ private struct LastWeeksChart: View {
         let a = activity
         let weeks = store.periodTotals(for: a.id, period: .week, count: 8, now: now)
         let goal = store.weeklyGoal(for: a, now: now)
-        let previous = weeks.dropLast()
-        let avg = previous.isEmpty ? 0 : previous.reduce(0) { $0 + $1.seconds } / Double(previous.count)
+        // Same average as the Stats "8-week trend" (all 8 weeks, this one included).
+        let avg = weeks.isEmpty ? 0 : weeks.reduce(0) { $0 + $1.seconds } / Double(weeks.count)
         let vsAvg = Fmt.signedPercent(weeks.last?.seconds ?? 0, vs: avg).map { "\($0) vs avg" }
         SectionLabel("Last 8 weeks", value: vsAvg).frame(height: 16)
         GrowGroup { grown in
