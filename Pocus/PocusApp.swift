@@ -44,14 +44,7 @@ struct PocusApp: App {
                 .onChange(of: scenePhase) { _, phase in
                     if phase == .active { store.refresh(silent: true) }
                 }
-                // Start / stop haptic, once per clock change (Home Play/Stop, Detail pill, in-process intents).
-                .sensoryFeedback(trigger: store.clockEvent) { _, event in
-                    switch event?.kind {
-                    case .start: .impact(weight: .medium)
-                    case .stop: .impact(weight: .heavy)
-                    case nil: nil
-                    }
-                }
+                .onAppear { Haptics.prepare() }
         }
     }
 

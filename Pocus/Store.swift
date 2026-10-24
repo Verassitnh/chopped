@@ -425,6 +425,7 @@ final class Store {
         let isRunning = activeSession?.id
         if loaded, !silent, isRunning != wasRunning {
             clockEvent = ClockEvent(kind: isRunning == nil ? .stop : .start, serial: (clockEvent?.serial ?? 0) + 1)
+            Task { @MainActor in isRunning == nil ? Haptics.clockedOut() : Haptics.clockedIn() }
         }
         loaded = true
         syncLiveActivity()

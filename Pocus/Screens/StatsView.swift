@@ -13,12 +13,12 @@ struct StatsView: View {
                 Ticker(every: 30) { now in
                     StatsPage(now: now, width: geo.size.width, range: $range)
                 }
-                .padding(.bottom, 120)
+                .padding(.bottom, 24)
             }
             .scrollIndicators(.hidden)
             .qcFullPage(.stats, width: geo.size.width) {
                 StatsPage(now: AppClock.now, width: geo.size.width, range: .constant(.week))
-                    .padding(.bottom, 120)
+                    .padding(.bottom, 24)
                     .environment(store)
                     .environment(router)
             }

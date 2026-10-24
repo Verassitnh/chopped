@@ -30,7 +30,7 @@ struct HomeView: View {
                     }
                     .padding(.horizontal, 12)
                     .padding(.top, 4)
-                    .padding(.bottom, 120)   // clears the floating tab bar
+                    .padding(.bottom, 24)
                 }
             }
             .scrollIndicators(.hidden)
