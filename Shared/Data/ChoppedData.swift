@@ -8,6 +8,15 @@ enum AppGroup {
     static var containerURL: URL? {
         FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: id)
     }
+
+    static let defaults = UserDefaults(suiteName: id)
+
+    /// Bool written by the app whenever it syncs the Live Activity (missing = assume enabled). Widgets use
+    /// it to skip the slower Live-Activity-starting Play intent when Live Activities are switched off.
+    static let liveActivitiesEnabledKey = "liveActivitiesEnabled"
+    static var liveActivitiesEnabled: Bool {
+        defaults?.object(forKey: liveActivitiesEnabledKey) as? Bool ?? true
+    }
 }
 
 /// Location of the SQLite database, shared through the App Group.

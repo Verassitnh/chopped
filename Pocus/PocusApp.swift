@@ -11,13 +11,20 @@ struct PocusApp: App {
         QC.configure()
         let store = QC.makeStore()
         _store = State(initialValue: store)
-        // Intents (widgets, Live Activity, controls) write the shared DB; reload the in-memory store after.
+        // Intents (widgets, Live Activity, controls) write the shared DB. `ChoppedSync` syncs the Live
+        // Activity straight from SQLite; the in-memory store is only re-read while the app is on screen
+        // (a background launch for an intent stays light; the foreground refresh below catches up).
         if !QC.demo {
-            ChoppedSync.appRefresh = { store.refresh() }
-            // Widget buttons run in the extension; re-read the DB when they change it. Silent (no haptic)
-            // unless the app is on screen.
+            ChoppedSync.appRefresh = {
+                if UIApplication.shared.applicationState == .active { store.refresh() }
+            }
+            // Widget buttons run in the extension and post this when the app is already running.
             ChoppedSync.observeExtensionChanges {
-                store.refresh(silent: UIApplication.shared.applicationState != .active)
+                if UIApplication.shared.applicationState == .active {
+                    store.refresh()
+                } else {
+                    LiveActivityBridge.sync(ChoppedData.snapshot()?.activityState)
+                }
             }
         }
         if let screen = QC.screen {

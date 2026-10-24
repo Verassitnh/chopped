@@ -102,7 +102,7 @@ struct QCSurfacesView: View {
                 }
                 VStack(spacing: 8) {
                     widgetFrame(exercise.color.tint, size: CGSize(width: small, height: small)) {
-                        SmallWidgetView(tracker: exercise, now: now)
+                        SmallWidgetView(tracker: exercise, somethingRunning: s.running != nil, now: now)
                     }
                     caption
                 }

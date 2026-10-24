@@ -22,7 +22,7 @@ struct LockActivityView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                IntentButton(intent: StopTrackerIntent(), accessibility: "Stop \(state.name)") {
+                IntentButton(intent: WidgetStopTrackerIntent(), accessibility: "Stop \(state.name)") {
                     SurfaceStopGlyph(size: 52, accent: color.accent)
                 }
             }
@@ -98,7 +98,7 @@ struct IslandStopButton: View {
     let state: ClockInState
 
     var body: some View {
-        IntentButton(intent: StopTrackerIntent(), accessibility: "Stop \(state.name)") {
+        IntentButton(intent: WidgetStopTrackerIntent(), accessibility: "Stop \(state.name)") {
             SurfaceStopGlyph(size: 52, accent: .black, background: state.color.accent)
         }
     }

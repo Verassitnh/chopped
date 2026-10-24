@@ -4,20 +4,21 @@ import WidgetKit
 
 /// Keeps every system surface (Live Activity, widgets, controls) in step with the database.
 enum ChoppedSync {
-    /// Set by the app at launch: reloads the in-memory `Store` from disk (which then syncs the
-    /// Live Activity and reloads widgets). nil inside the widget extension.
+    /// Set by the app at launch: re-reads the in-memory `Store` (UI + haptic) when the app is on screen.
+    /// nil inside the widget extension.
     @MainActor static var appRefresh: (() -> Void)?
 
     /// Call after an intent changed the database (synchronously, before `perform()` returns).
     @MainActor static func didChange() {
+        // Widgets / controls first, so every surface flips right away.
+        reloadSurfaces()
         if let appRefresh {
+            // App process: straight from SQLite (no full Store load), then the Store if it's on screen.
+            LiveActivityBridge.sync(ChoppedData.snapshot()?.activityState)
             appRefresh()
         } else {
-            // Widget extension: widgets / controls first, so every surface flips right away.
-            reloadSurfaces()
-            // Update / end the Live Activity if this process can see it (it can't start one).
-            LiveActivityBridge.sync(ChoppedData.snapshot()?.activityState, canRequest: false)
-            // Tell a running app to re-read the database (which also syncs the Live Activity).
+            // Widget extension: it can't see the app's Live Activity. The widget intents chain
+            // `SyncLiveActivityIntent` into the app for that; this wakes an app that's already running.
             CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(),
                                                  CFNotificationName(changedNotification as CFString), nil, nil, true)
         }
@@ -49,8 +50,12 @@ enum ChoppedSync {
 enum LiveActivityBridge {
     private typealias ClockIn = ActivityKit.Activity<PocusActivityAttributes>
 
-    /// - Parameter canRequest: false in the widget extension, which may update / end but never start one.
-    static func sync(_ state: PocusActivityAttributes.ContentState?, canRequest: Bool = true) {
+    /// App process only (the widget extension can't see the app's activities).
+    static func sync(_ state: PocusActivityAttributes.ContentState?) {
+        let enabled = ActivityAuthorizationInfo().areActivitiesEnabled
+        if AppGroup.defaults?.object(forKey: AppGroup.liveActivitiesEnabledKey) as? Bool != enabled {
+            AppGroup.defaults?.set(enabled, forKey: AppGroup.liveActivitiesEnabledKey)
+        }
         let running = ClockIn.activities.filter { $0.activityState == .active || $0.activityState == .stale }
 
         guard let state else {
@@ -70,7 +75,7 @@ enum LiveActivityBridge {
             if current.content.state != state || current.content.staleDate != content.staleDate {
                 Task { await current.update(content) }
             }
-        } else if canRequest, ActivityAuthorizationInfo().areActivitiesEnabled {
+        } else if enabled {
             do {
                 _ = try ClockIn.request(attributes: PocusActivityAttributes(), content: content)
             } catch {

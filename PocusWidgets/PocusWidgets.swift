@@ -161,7 +161,7 @@ struct TrackerWidget: Widget {
     var body: some WidgetConfiguration {
         AppIntentConfiguration(kind: "ChoppedTracker", intent: SelectTrackerIntent.self, provider: TrackerProvider()) { entry in
             if let t = entry.smallTracker {
-                SmallWidgetView(tracker: t, now: entry.date)
+                SmallWidgetView(tracker: t, somethingRunning: entry.snapshot?.running != nil, now: entry.date)
                     .containerBackground(t.color.tint, for: .widget)
             } else {
                 EmptyWidgetView()

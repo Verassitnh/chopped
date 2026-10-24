@@ -44,7 +44,6 @@ struct MediumWidgetView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             if let start = t.runningStart {
                 LiveTimerText(start: start, style: .compact, now: now)
-                    .invalidatableContent()
                     .geistPixel(34)
                     .foregroundStyle(CH.onAccent)
                     .multilineTextAlignment(.trailing)
@@ -59,7 +58,7 @@ struct MediumWidgetView: View {
                     .geistMono(26, .medium, tracking: -0.05, lineHeight: 30)
                     .foregroundStyle(CH.onAccent)
                     .numericMorph()
-                IntentButton(intent: WidgetStartTrackerIntent(trackerID: t.id), accessibility: "Start \(t.name)") {
+                WidgetPlayButton(tracker: t, somethingRunning: snapshot.running != nil) {
                     PlayButton(size: 36)
                 }
             }
@@ -81,7 +80,7 @@ struct MediumWidgetView: View {
                 .geistMono(14, .medium, tracking: -0.02, lineHeight: 18)
                 .foregroundStyle(CH.textMuted)
                 .numericMorph()
-            IntentButton(intent: WidgetStartTrackerIntent(trackerID: t.id), accessibility: "Start \(t.name)") {
+            WidgetPlayButton(tracker: t, somethingRunning: snapshot.running != nil) {
                 PlayButton(size: 26, background: Color.white.opacity(0.1))
             }
         }
@@ -93,6 +92,8 @@ struct MediumWidgetView: View {
 /// Small: one tracker. Running → stop + Pixel timer; idle → play + mono total "/goal".
 struct SmallWidgetView: View {
     let tracker: TrackerSnapshot
+    /// Another tracker is running (Play switches instead of starting fresh).
+    var somethingRunning = false
     var now: Date
 
     var body: some View {
@@ -108,7 +109,7 @@ struct SmallWidgetView: View {
                             SurfaceStopGlyph(size: 34, accent: accent)
                         }
                     } else {
-                        IntentButton(intent: WidgetStartTrackerIntent(trackerID: t.id), accessibility: "Start \(t.name)") {
+                        WidgetPlayButton(tracker: t, somethingRunning: somethingRunning) {
                             PlayButton(size: 34)
                         }
                     }
@@ -121,7 +122,6 @@ struct SmallWidgetView: View {
                         .lineLimit(1)
                     if let start = t.runningStart {
                         LiveTimerText(start: start, style: .compact, now: now)
-                    .invalidatableContent()
                             .geistPixel(40)
                             .foregroundStyle(CH.onAccent)
                             .lineLimit(1)
@@ -149,6 +149,24 @@ struct SmallWidgetView: View {
                 .padding(EdgeInsets(top: 0, leading: 14, bottom: 0, trailing: 12))
         }
         .padding(EdgeInsets(top: 5, leading: 5, bottom: 12, trailing: 5))
+    }
+}
+
+/// Widget Play. Switching while something runs, or starting while Live Activities are off, runs in the widget
+/// extension and flips at once. Starting fresh has to create a Live Activity, which iOS only lets a
+/// background app do from a `LiveActivityIntent` (run in the app via the system's Shortcuts runner, ~2s
+/// before the widget updates), so that case uses `StartTrackerIntent`. See `ChoppedIntents.swift`.
+struct WidgetPlayButton<Label: View>: View {
+    let tracker: TrackerSnapshot
+    let somethingRunning: Bool
+    @ViewBuilder var label: Label
+
+    var body: some View {
+        if somethingRunning || !AppGroup.liveActivitiesEnabled {
+            IntentButton(intent: WidgetStartTrackerIntent(trackerID: tracker.id), accessibility: "Start \(tracker.name)") { label }
+        } else {
+            IntentButton(intent: StartTrackerIntent(trackerID: tracker.id), accessibility: "Start \(tracker.name)") { label }
+        }
     }
 }
 
