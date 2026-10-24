@@ -2,8 +2,8 @@ import SwiftUI
 
 /// 02 Tracker detail sheet (Paper AGW-0). Presented by RootView via `router.detailActivityID`.
 /// Full-accent header (grabber, icon/name, close X, Pixel timer, progress strip, big Stop/Start pill),
-/// then this week's day bars, the entries list (tap to fix times, + Add to log time), the tracker
-/// settings list (opens the editor) and DELETE TRACKER.
+/// then this week's day bars, the entries list (tap to fix times, + Add to log time), then EDIT TRACKER
+/// (opens the 05 sheet in edit mode) over DELETE TRACKER.
 struct TrackerDetailView: View {
     @Environment(Store.self) private var store
     @Environment(AppRouter.self) private var router
@@ -22,7 +22,9 @@ struct TrackerDetailView: View {
                 Ticker { now in content(a, now: now) }
                     .sheet(item: $editingSession) { s in EntryEditSheet(session: s, activity: a) }
                     .sheet(isPresented: $addingEntry) { AddEntrySheet(activity: a) }
-                    .sheet(isPresented: $editingTracker) { NewTrackerView(editing: a) }
+                    // Same edge-to-edge 05 sheet as the home "+", over the detail.
+                    .newTrackerOverlay(isPresented: $editingTracker, editing: a)
+                    .sensoryFeedback(.impact(weight: .light), trigger: editingTracker) { _, open in open }
                     .confirmationDialog("Delete \(a.name)?", isPresented: $confirmingDelete, titleVisibility: .visible) {
                         Button("Delete Tracker", role: .destructive) { delete(a) }
                     } message: {
@@ -42,26 +44,20 @@ struct TrackerDetailView: View {
     private func content(_ a: Activity, now: Date) -> some View {
         ScrollView {
             VStack(spacing: 0) {
-                DetailHeader(activity: a, now: now, close: { dismiss() }, toggle: { toggle(a) },
-                             editName: { editingTracker = true })
+                DetailHeader(activity: a, now: now, close: { dismiss() }, toggle: { toggle(a) })
                 weekBars(a, now: now)
                     .padding(.horizontal, 20)
                     .padding(.top, 32)
                 entries(a, now: now)
                     .padding(.horizontal, 20)
                     .padding(.top, 52)
-                settings(a)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 52)
-                Button { confirmingDelete = true } label: {
-                    Text("DELETE TRACKER")
-                        .geistMono(13, .medium, tracking: 0.08, lineHeight: 16)
-                        .foregroundStyle(Color(hex: "#FF453A"))
-                        .padding(.vertical, 8).padding(.horizontal, 16)
-                        .contentShape(Rectangle())
+                // Paper: 52 below the entries, 20 between the two labels, 64 to the bottom
+                // (each label carries 8pt of tap padding above and below).
+                VStack(spacing: 4) {
+                    textButton("EDIT TRACKER", color: Color(hex: "#F2F2F7")) { editingTracker = true }
+                    textButton("DELETE TRACKER", color: Color(hex: "#FF453A")) { confirmingDelete = true }
                 }
-                .buttonStyle(.pressScale)
-                .padding(.top, 28)
+                .padding(.top, 44)
                 .padding(.bottom, 56)
             }
         }
@@ -72,6 +68,18 @@ struct TrackerDetailView: View {
         .clipShape(UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28, style: .continuous))
         .padding(.top, 8)
         .ignoresSafeArea(edges: .bottom)
+    }
+
+    /// Geist Mono 13 caps text button (EDIT / DELETE TRACKER).
+    private func textButton(_ title: String, color: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .geistMono(13, .medium, tracking: 0.08, lineHeight: 16)
+                .foregroundStyle(color)
+                .padding(.vertical, 8).padding(.horizontal, 16)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.pressScale)
     }
 
     private func toggle(_ a: Activity) {
@@ -197,51 +205,6 @@ struct TrackerDetailView: View {
         f.dateFormat = "EEEE"
         return f.string(from: day)
     }
-
-    // MARK: Settings
-
-    private func settings(_ a: Activity) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Tracker")
-                .geist(17, .semibold, tracking: -0.01, lineHeight: 16)
-                .foregroundStyle(CH.text)
-            VStack(spacing: 0) {
-                settingsRow("Icon") {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(a.color.accent)
-                        .frame(width: 28, height: 28)
-                        .overlay { GlyphView(a.glyph, size: 16, color: .white, strokeWidth: 2.2) }
-                }
-                settingsRow("Color") {
-                    Circle().fill(a.color.accent).frame(width: 16, height: 16)
-                }
-                settingsRow("Track per") {
-                    Text(a.period.title).geistMono(14, .medium, lineHeight: 18).foregroundStyle(Color(hex: "#7A7A7A"))
-                }
-                settingsRow("Goal") {
-                    Text(Fmt.hm(a.goal)).geistMono(14, .medium, lineHeight: 18).foregroundStyle(Color(hex: "#7A7A7A"))
-                }
-            }
-            .padding(.horizontal, 16)
-            .background(CH.raised, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        }
-    }
-
-    private func settingsRow<Trailing: View>(_ title: String, @ViewBuilder trailing: () -> Trailing) -> some View {
-        Button { editingTracker = true } label: {
-            HStack(spacing: 12) {
-                Text(title)
-                    .geist(16, .medium, lineHeight: 20)
-                    .foregroundStyle(Color(hex: "#BDBDBD"))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                trailing()
-                RowChevron()
-            }
-            .frame(height: 54)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.pressScale)
-    }
 }
 
 // MARK: - Header
@@ -253,7 +216,6 @@ private struct DetailHeader: View {
     let now: Date
     var close: () -> Void
     var toggle: () -> Void
-    var editName: () -> Void
 
     var body: some View {
         let a = activity
@@ -268,22 +230,17 @@ private struct DetailHeader: View {
 
             HStack(spacing: 12) {
                 IconTile(glyph: a.glyph, size: 40, radius: 12, glyphSize: 20)
-                Button(action: editName) {
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(a.name)
-                            .geist(22, .semibold, tracking: -0.02, lineHeight: 26)
-                            .foregroundStyle(CH.onAccent)
-                            .lineLimit(1)
-                        Text("\(a.goalLine) · resets \(Self.resetLabel(a.period))")
-                            .geist(13, .medium, lineHeight: 17)
-                            .foregroundStyle(CH.onAccentSecondary)
-                            .lineLimit(1)
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 44, maxHeight: 44, alignment: .leading)
-                    .contentShape(Rectangle())
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(a.name)
+                        .geist(22, .semibold, tracking: -0.02, lineHeight: 26)
+                        .foregroundStyle(CH.onAccent)
+                        .lineLimit(1)
+                    Text("\(a.goalLine) · resets \(Self.resetLabel(a.period))")
+                        .geist(13, .medium, lineHeight: 17)
+                        .foregroundStyle(CH.onAccentSecondary)
+                        .lineLimit(1)
                 }
-                .buttonStyle(PressScaleStyle(scale: 0.98))
-                .accessibilityHint("Edit tracker")
+                .frame(maxWidth: .infinity, minHeight: 44, maxHeight: 44, alignment: .leading)
                 CircleIconButton(glyph: .close, size: 36, glyphSize: 14,
                                  background: Color.black.opacity(0.12), foreground: .black, action: close)
                     .accessibilityLabel("Close")
@@ -423,17 +380,5 @@ struct GlassPill: View {
             .contentShape(Capsule())
         }
         .buttonStyle(.pressScale)
-    }
-}
-
-/// 7×12 row chevron (#4A4A4A, stroke 1.8).
-struct RowChevron: View {
-    var color = Color(hex: "#4A4A4A")
-    var body: some View {
-        Path { p in
-            p.move(to: CGPoint(x: 1, y: 1)); p.addLine(to: CGPoint(x: 6, y: 6)); p.addLine(to: CGPoint(x: 1, y: 11))
-        }
-        .stroke(color, style: StrokeStyle(lineWidth: 1.8, lineCap: .round, lineJoin: .round))
-        .frame(width: 7, height: 12)
     }
 }

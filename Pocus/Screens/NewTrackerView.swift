@@ -9,7 +9,7 @@ struct NewTrackerView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let editing: Activity?
-    /// Set when shown by `.newTrackerOverlay` (home "+"); nil when presented as a system sheet (editor).
+    /// Set when shown by `.newTrackerOverlay` (home "+", detail EDIT TRACKER); nil as a system sheet.
     private let onClose: (() -> Void)?
     @State private var dragOffset: CGFloat = 0
 
@@ -367,13 +367,15 @@ struct NewTrackerView: View {
 extension View {
     /// Presents `NewTrackerView` over everything as the design's edge-to-edge sheet: the screen behind
     /// fades to 35% (scrim = #0C0C0E @ 65%) and the 706pt surface slides up from the bottom.
-    func newTrackerOverlay(isPresented: Binding<Bool>) -> some View {
-        modifier(NewTrackerOverlay(isPresented: isPresented))
+    /// Pass `editing` to open it as the editor for that tracker (from the detail sheet).
+    func newTrackerOverlay(isPresented: Binding<Bool>, editing: Activity? = nil) -> some View {
+        modifier(NewTrackerOverlay(isPresented: isPresented, editing: editing))
     }
 }
 
 private struct NewTrackerOverlay: ViewModifier {
     @Binding var isPresented: Bool
+    var editing: Activity?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func body(content: Content) -> some View {
@@ -386,7 +388,7 @@ private struct NewTrackerOverlay: ViewModifier {
                             .onTapGesture { isPresented = false }
                             .accessibilityHidden(true)
                             .transition(.opacity)
-                        NewTrackerView(onClose: { isPresented = false })
+                        NewTrackerView(editing: editing, onClose: { isPresented = false })
                             .accessibilityAddTraits(.isModal)
                             .transition(reduceMotion ? .opacity : .move(edge: .bottom))
                             .zIndex(1)
