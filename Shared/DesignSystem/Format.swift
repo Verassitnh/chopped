@@ -39,11 +39,11 @@ enum Fmt {
     /// 0.913 → "91%".
     static func percent(_ f: Double) -> String { "\(Int((f * 100).rounded()))%" }
 
-    /// "+13%" / "-4%" relative change; nil when `base` is 0.
+    /// "+13%" / "−20%" relative change (true minus sign, like the time deltas); nil when `base` is 0.
     static func signedPercent(_ value: Double, vs base: Double) -> String? {
         guard base > 0 else { return nil }
         let p = Int(((value - base) / base * 100).rounded())
-        return (p < 0 ? "" : "+") + "\(p)%"
+        return (p < 0 ? "\u{2212}" : "+") + "\(abs(p))%"
     }
 
     /// "20:06" — 24h clock time.

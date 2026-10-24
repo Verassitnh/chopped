@@ -1,112 +1,82 @@
-import datetime as dt, json, sys
-from design import ex as EX0, em as EM0
-from heat import L as HEAT
+"""Solve the per-day demo table against the (consistency-edited) designs. Writes days.json.
+Decisions (design edits) are encoded as hard constraints below."""
+import pulp, json, datetime as dt
+from facts import *
+T=1500/7+480/7+45+30+9000/365
+RDW=9000/365*7
 TR=['dw','mt','ex','em','rd']
-GOAL={'dw':1500,'mt':480,'ex':45,'em':30,'rd':9000}
-SHARE={'dw':1500/7,'mt':480/7,'ex':45,'em':30,'rd':9000/365}
-T=sum(SHARE.values())
-E0,E1=0.125,0.25
-D0=dt.date(2026,8,2)          # first heat cell (Sun)
-W0=dt.date(2026,8,3)          # week idx 0 (Mon)
-TODAY=dt.date(2026,10,23)
-def day(i): return W0+dt.timedelta(i)
-mins={}                        # date -> {tr: minutes}
-def setm(d,tr,m):
-    mins.setdefault(d,{t:0 for t in TR})[tr]=m
-def getm(d,tr): return mins.get(d,{}).get(tr,0)
-def tot(d): return sum(mins.get(d,{}).values())
-
-# ---- daily lanes (design, adjusted) ----
-ex=EX0[:]; em=EM0[:]
-ex[25]=0                       # Fri Aug 28 is an empty heat cell
-# last 2 weeks: table/home/dots (i 70..81 = Oct 12..23)
-ex[70:82]=[0,0,0,1,0,1,1,1,1,1,1,0]
-em[70:82]=[0,1,1,1,0,0,0,1,1,1,1,0]
-for i in range(70):            # older days: hits 45/30
-    if ex[i]: setm(day(i),'ex',45)
-    if em[i]: setm(day(i),'em',30)
-
-# ---- this week (Mon 19 .. Fri 23), fixed ----
-TW={ 'dw':[252,306,228,360,223],'ex':[50,45,50,50,30],'em':[40,30,42,40,27],
-     'mt':[90,0,50,130,54],'rd':[45,0,0,45,0]}
-for t,v in TW.items():
-    for k,m in enumerate(v): setm(day(77+k),t,m)
-# ---- last week (Mon 12 .. Sun 18), fixed ----
-LW={ 'dw':[350,360,60,60,50,290,0],'ex':[15,0,15,45,15,45,45],'em':[20,30,30,30,20,20,20],
-     'mt':[0,0,120,120,95,0,35],'rd':[0,0,0,0,0,42,0]}
-for t,v in LW.items():
-    for k,m in enumerate(v): setm(day(70+k),t,m)
-
-def level_of(d):
-    j=(d-D0).days; return HEAT[j]
-WANT_LEVEL={}                  # deliberate heat deviations
-WANT_LEVEL[dt.date(2026,9,18)]=1   # lanes keep Ex+Em (best runs) -> low, not empty
-WANT_LEVEL[dt.date(2026,9,11)]=2   # week of Sep 7 needs capacity for its 73px trend bar
-WANT_LEVEL[dt.date(2026,10,22)]=3  # Thu 6:00 DW + Ex streak -> perfect
-WANT_LEVEL[dt.date(2026,10,23)]=2  # today in progress
-def want(d): return WANT_LEVEL.get(d, level_of(d))
-def band(d):
-    v=want(d)
-    lo={0:0,1:E0*T,2:E1*T,3:T}[v]; hi={0:E0*T,1:E1*T,2:T,3:10**6}[v]
-    import math
-    return (0 if v==0 else math.ceil(lo+1e-9), math.ceil(hi)-1)
-
-# ---- weekly fill plans for older weeks: (dw, mt, rd) minutes ----
-PLAN={
-  # idx: (dw, mt, rd)
-  0:(None,480,30), 1:(None,0,180), 2:(None,0,180), 3:(None,480,40),
-  4:(1010,None,173), 5:(1100,None,173), 6:(1025,None,0), 7:(1235,None,0), 8:(1145,None,0), 9:(1280,None,0),
-}
-WEEKTOT={4:1466,5:1671,6:1602,7:1807,8:1716,9:1876}
-def fill_week(k):
-    days=[day(7*k+d) for d in range(7)]
-    for d in days: mins.setdefault(d,{t:0 for t in TR})
-    dwT,mtT,rdT=PLAN[k]
-    lanes=sum(tot(d) for d in days)
-    if k in WEEKTOT:
-        rest=WEEKTOT[k]-dwT-lanes-rdT
-        mtT=rest
-    caps=[]
+days=[D0+dt.timedelta(i) for i in range((TODAY-D0).days+1)]
+# ---- design after edits
+HEAT2=dict(HEAT)
+for d,l in [((8,31),2),((9,2),2),((9,8),2),((9,9),2),((9,11),2),((9,18),1),((10,22),3)]:
+    HEAT2[dt.date(2026,*d)]=l
+EX2=EX[:]; EX2[25]=0          # Fri Aug 28 (empty heat cell)
+EM2=EM[:]
+DW2=DW[:]; DW2[1]=0; DW2[3]=0
+MT2=MT[:]; MT2[1]=0
+RD2=RD[:]; RD2[11]=0          # current week not hit (3w)
+P=pulp.LpProblem('c',pulp.LpMinimize)
+m={(d,t):pulp.LpVariable(f"m_{d:%m%d}_{t}",0,None,cat='Integer') for d in days for t in TR}
+FRI={k:W0+dt.timedelta(7*k+4) for k in range(4,11)}
+post={(k,t):pulp.LpVariable(f"p_{k}_{t}",0,None,cat='Integer') for k in FRI for t in ['dw','mt']}
+for k in FRI:
+    P+= post[k,'dw']+post[k,'mt']<=180
+    for t in ['dw','mt']: P+= post[k,t]<=m[FRI[k],t]
+CAP={'dw':540,'mt':300,'ex':120,'em':90,'rd':200}
+reg=[]
+for d in days:
+    for t in TR: P+= m[d,t]<=CAP[t]
+    P+= pulp.lpSum(m[d,t] for t in TR)<=720
+    if d.weekday()>=5: reg.append(1.0*(m[d,'dw']+m[d,'mt']))
+reg+= [2.0*v for v in post.values()]
+# this week
+tw=[W0+dt.timedelta(77+i) for i in range(5)]
+for d,v in zip(tw,[252,306,228,360,223]): P+= m[d,'dw']==v
+P+= m[tw[4],'ex']==30; P+= m[tw[4],'em']==27
+P+= pulp.lpSum(m[d,'ex'] for d in tw)==225
+P+= pulp.lpSum(m[d,'em'] for d in tw)==179
+P+= pulp.lpSum(m[d,'mt'] for d in tw)==324
+P+= pulp.lpSum(m[d,'rd'] for d in tw)==90
+# heat (hard, with 1-minute margins)
+UB={0:T/8,1:T/4,2:T,3:10**4}; LB={0:0,1:T/8,2:T/4,3:T}
+for d in days:
+    tot=pulp.lpSum(m[d,t] for t in TR); l=HEAT2[d]
+    if l>0: P+= tot>=LB[l]+1
+    P+= tot<=UB[l]-1
+# daily lanes (idx 0..80 completed; today fixed)
+for name,lanev,goal in [('ex',EX2,45),('em',EM2,30)]:
+    for i in range(81):
+        d=W0+dt.timedelta(i)
+        if lanev[i]: P+= m[d,name]>=goal
+        else: P+= m[d,name]<=goal-1
+# weekly hits
+WG={'dw':1500,'mt':480,'rd':RDW}
+for t,pat in [('dw',DW2),('mt',MT2),('rd',RD2)]:
+    for k in range(11):
+        s=pulp.lpSum(m[W0+dt.timedelta(7*k+i),t] for i in range(7))
+        if pat[k]: P+= s>=WG[t]*1.02
+        else: P+= s<=WG[t]-1
+DWT={4:1560,5:1290,6:1530,7:1650,8:1590,9:1710,10:1545}
+for k,v in DWT.items(): P+= pulp.lpSum(m[W0+dt.timedelta(7*k+i),'dw'] for i in range(7))==v
+# goal % lines: share of the weekly goal logged by the same point in the week (Fri 20:56)
+LG={'dw':1500,'mt':480,'ex':315}
+for t in ['dw','mt','ex']:
+    for j,k in enumerate(range(4,11)):
+        s=pulp.lpSum(m[W0+dt.timedelta(7*k+i),t] for i in range(5)) - (post[k,t] if t in('dw','mt') else 0)
+        tgt=LINE[t][j]*LG[t]
+        P+= s>=round(tgt-0.0024*LG[t]+0.4999); P+= s<=int(tgt+0.0024*LG[t])
+# perfect days = 16
+P+= pulp.lpSum(1 for d in days if HEAT2[d]==3)==16
+# realism: prefer weekday work, spread DW evenly-ish (penalise big days)
+big={d:pulp.LpVariable(f"big_{d:%m%d}",0) for d in days}
+for d in days: P+= big[d]>=m[d,'dw']-330
+reg+= [0.5*v for v in big.values()]
+for t,lim in [('mt',150),('rd',120),('ex',60),('em',45)]:
     for d in days:
-        lo,hi=band(d); caps.append([lo,hi])
-    if dwT is None:   # free week: fill DW to ~60% of the remaining capacity
-        room=sum(max(0,min(hi,2000)-tot(d)) for d,(lo,hi) in zip(days,caps))
-        dwT=max(0,int((room-mtT-rdT)*0.7))
-    need={'dw':dwT,'mt':mtT,'rd':rdT}
-    order=['rd','mt','dw']
-    # 1) reach each day's lower bound
-    for d,(lo,hi) in zip(days,caps):
-        for t in (['dw','mt','rd'] if d.weekday()<5 else ['rd','mt','dw']):
-            short=lo-tot(d)
-            if short<=0: break
-            if need[t]<=0: continue
-            a=min(short,need[t]); setm(d,t,getm(d,t)+a); need[t]-=a
-    # 2) distribute the rest: green days first, then mids, then lows
-    pri=sorted(range(7),key=lambda x:(-want(days[x]),x))
-    for t in ['rd','mt','dw']:
-        # spread rd/mt across days evenly where room
-        while need[t]>0:
-            moved=False
-            for x in pri:
-                d=days[x]; lo,hi=caps[x]
-                room=hi-tot(d)
-                if room<=0 or want(d)==0: continue
-                if room<5 and need[t]>room: continue
-                chunk={'rd':30,'mt':30,'dw':60}[t]
-                a=min(chunk,room,need[t])
-                if a<=0: continue
-                setm(d,t,getm(d,t)+a); need[t]-=a; moved=True
-                if need[t]<=0: break
-            if not moved: break
-    if any(v>0 for v in need.values()): print("WEEK",k,"UNPLACED",need, file=sys.stderr)
-for k in range(10): fill_week(k)
-# Sun Aug 2 (heat low): a little reading
-setm(D0,'rd',60)
-
-# ---- Reading before Aug 2: Saturdays from Jan 3 so YTD = 96:10 (5770) ----
-ytd=sum(getm(d,'rd') for d in list(mins) if d.year==2026)
-rest=5770-ytd
-sats=[dt.date(2026,1,3)+dt.timedelta(7*n) for n in range(30)]
-for n,s in enumerate(sats):
-    setm(s,'rd',rest//30+(1 if n<rest%30 else 0))
-json.dump({d.isoformat():v for d,v in sorted(mins.items())},open('days.json','w'))
+        o=pulp.LpVariable(f"o_{t}_{d:%m%d}",0); P+= o>=m[d,t]-lim; reg.append(2*o)
+# misses shouldn't be near-zero crumbs: discourage 1..9 minute entries softly by rewarding 0 (skip; keep simple)
+P+= pulp.lpSum(reg)
+P.solve(pulp.HiGHS(msg=False,timeLimit=120))
+print(pulp.LpStatus[P.status], pulp.value(P.objective))
+res={d.isoformat():{t:int(round(m[d,t].value())) for t in TR} for d in days}
+json.dump({'days':res,'post':{str(k):{t:int(round(post[k,t].value())) for t in ['dw','mt']} for k in FRI}},open('days.json','w'),indent=0)

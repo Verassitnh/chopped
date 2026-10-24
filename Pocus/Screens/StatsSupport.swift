@@ -31,29 +31,39 @@ struct GoalSeries {
 
     var completed: [GoalResult] { results.filter { !$0.isCurrent } }
 
-    /// Index ranges of consecutive hit periods (an unfinished, not-yet-hit current period doesn't break a run).
+    /// Whether period `i` belongs to a streak: a hit, or, for daily goals, today while it's still in progress
+    /// right after a hit day (a day streak isn't broken until the day is over). Weekly and pro-rated goals
+    /// only count the current week once it's hit.
+    func counts(_ i: Int) -> Bool {
+        let r = results[i]
+        if r.hit { return true }
+        return unit == "d" && r.isCurrent && i > 0 && results[i - 1].hit
+    }
+
+    /// Index ranges of consecutive counting periods (see `counts`).
     var runs: [ClosedRange<Int>] {
         var out: [ClosedRange<Int>] = []
-        var start: Int?
-        for (i, r) in results.enumerated() {
-            if r.hit {
+        var start: Int?, end = 0
+        for i in results.indices {
+            if counts(i) {
                 if start == nil { start = i }
-            } else if !r.isCurrent, let s = start {
-                out.append(s...(i - 1)); start = nil
+                end = i
+            } else if let s = start {
+                out.append(s...end); start = nil
             }
         }
-        if let s = start, let last = results.lastIndex(where: \.hit) { out.append(s...last) }
+        if let s = start { out.append(s...end) }
         return out
     }
 
     var best: Int { runs.map(\.count).max() ?? 0 }
 
-    /// Trailing hits, ignoring an unfinished, not-yet-hit current period.
+    /// Trailing counting periods ("6d" includes today while it's still in progress).
     var current: Int {
         var n = 0
-        for r in results.reversed() {
-            if r.isCurrent && !r.hit { continue }
-            if r.hit { n += 1 } else { break }
+        for i in results.indices.reversed() {
+            if results[i].isCurrent && !counts(i) { continue }
+            if counts(i) { n += 1 } else { break }
         }
         return n
     }
@@ -88,6 +98,17 @@ extension Store {
             }
             return GoalSeries(results: results, unit: "w")
         }
+    }
+
+    /// Fraction of the weekly-equivalent goal logged in `week` up to the same point in the week as `now`
+    /// (e.g. Mon 00:00 → Fri 20:56), so past weeks compare like-for-like with the week in progress.
+    /// Drives the "Goal % · 8 weeks" lines; the current week gives this week's share so far.
+    func weekFractionToDate(for a: Activity, week: DateInterval, now: Date) -> Double {
+        let g = weeklyGoal(for: a, now: now)
+        guard g > 0 else { return 0 }
+        let elapsed = now.timeIntervalSince(Store.week(containing: now).start)
+        let span = DateInterval(start: week.start, duration: min(max(0, elapsed), week.duration))
+        return total(for: a.id, in: span, now: now) / g
     }
 
     /// Fraction of the weekly-equivalent goal logged in `week`.

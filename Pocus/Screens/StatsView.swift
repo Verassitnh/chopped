@@ -504,10 +504,7 @@ private struct GoalPercentChart: View {
             .prefix(3)
             .sorted { store.weekFraction(for: $0.0, week: thisWeek, now: now) > store.weekFraction(for: $1.0, week: thisWeek, now: now) }
             .map { a, _ in
-                Line(activity: a, values: weeks.enumerated().map { i, wk in
-                    if i == weeks.count - 1, a.period == .day || a.period == .week { return store.progress(for: a, now: now) }
-                    return store.weekFraction(for: a, week: wk, now: now)
-                })
+                Line(activity: a, values: weeks.map { store.weekFractionToDate(for: a, week: $0, now: now) })
             }
         let best = lines.max { $0.current < $1.current }
         let plotRight = width - 38

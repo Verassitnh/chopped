@@ -177,6 +177,9 @@ private struct LastWeeksChart: View {
         // Same average as the Stats "8-week trend" (all 8 weeks, this one included).
         let avg = weeks.isEmpty ? 0 : weeks.reduce(0) { $0 + $1.seconds } / Double(weeks.count)
         let vsAvg = Fmt.signedPercent(weeks.last?.seconds ?? 0, vs: avg).map { "\($0) vs avg" }
+        // 100pt = the taller of the goal and the best week; the dashed goal line sits at the goal's height.
+        let scale = max(goal, weeks.map(\.seconds).max() ?? 0)
+        let goalLineY: CGFloat = scale > 0 ? 101 - (goal / scale * 100).rounded() : 1
         SectionLabel("Last 8 weeks", value: vsAvg).frame(height: 16)
         GrowGroup { grown in
             HStack(alignment: .bottom, spacing: 6) {
@@ -185,7 +188,7 @@ private struct LastWeeksChart: View {
                     VStack(spacing: 6) {
                         RoundedRectangle(cornerRadius: 4, style: .continuous)
                             .fill(isNow ? a.color.accent : CH.past)
-                            .frame(height: goal > 0 ? min(101, (wk.seconds / goal * 100).rounded()) : 0)
+                            .frame(height: scale > 0 ? (wk.seconds / scale * 100).rounded() : 0)
                             .growIn(grown, delay: Double(i) * 0.03)
                         Text(isNow ? "NOW" : StatsFmt.weekLabel(wk.start))
                             .geistMono(8, isNow ? .semibold : .medium, lineHeight: 12).frame(height: 12)
@@ -200,12 +203,13 @@ private struct LastWeeksChart: View {
             .overlay(alignment: .top) {
                 Line().stroke(Color.white.opacity(0x47 / 255), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
                     .frame(height: 1)
+                    .offset(y: goalLineY - 1)
             }
             .overlay(alignment: .topTrailing) {
                 Text("GOAL \(Fmt.words(goal).uppercased())")
                     .geistMono(8, .medium, tracking: 0.06, lineHeight: 12).frame(height: 12)
                     .foregroundStyle(CH.textTertiary)
-                    .offset(y: -16)
+                    .offset(y: goalLineY - 1 - 16)
             }
         }
     }

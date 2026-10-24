@@ -15,13 +15,16 @@ struct HomeView: View {
                     header(now: now)
                     VStack(spacing: 14) {
                         ForEach(store.activities) { a in
-                            TrackerCard(activity: a, now: now,
-                                        start: { toggle { store.clockIn(a) } },
-                                        stop: { toggle { store.stop() } })
-                                .contentShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
-                                .onTapGesture { router.openDetail(a.id) }
-                                .accessibilityAddTraits(.isButton)
-                                .accessibilityHint("Opens tracker details")
+                            // The card is a Button (press feedback: 0.98 spring, off with Reduce Motion); its
+                            // Play/Stop are separate Buttons inside the label, so they take their own taps.
+                            Button { router.openDetail(a.id) } label: {
+                                TrackerCard(activity: a, now: now,
+                                            start: { toggle { store.clockIn(a) } },
+                                            stop: { toggle { store.stop() } })
+                                    .contentShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+                            }
+                            .buttonStyle(PressScaleStyle(scale: 0.98))
+                            .accessibilityHint("Opens tracker details")
                         }
                         if store.activities.isEmpty { emptyState }
                     }
@@ -176,11 +179,10 @@ struct TrackerCard: View {
         return "\(a.period.adjective) · \(Fmt.goal(minutes: a.goalMinutes)) · \(streak)-\(unit) streak"
     }
 
-    /// Shortest streak shown on the card (a few days in a row; any multi-period run for longer periods).
+    /// Shortest streak shown on the card: five days or weeks in a row; any multi-period run for longer periods.
     static func streakThreshold(_ period: GoalPeriod) -> Int {
         switch period {
-        case .day: 5
-        case .week: 3
+        case .day, .week: 5
         case .month, .year: 2
         }
     }

@@ -1,67 +1,60 @@
-import json, datetime as dt
-from heat import L as HEAT
-from gen import WANT_LEVEL
-TR=['dw','mt','ex','em','rd']
+import json, datetime as dt, math
+from facts import *
+J=json.load(open('days.json')); M={dt.date.fromisoformat(k):v for k,v in J['days'].items()}
+TR=['dw','mt','ex','em','rd']; NAME=dict(dw='Deep Work',mt='Meetings',ex='Exercise',em='Email',rd='Reading')
 GOAL={'dw':1500,'mt':480,'ex':45,'em':30,'rd':9000}
-SHARE={'dw':1500/7,'mt':480/7,'ex':45,'em':30,'rd':9000/365}
-T=sum(SHARE.values())
-raw=json.load(open('days.json'))
-M={dt.date.fromisoformat(k):v for k,v in raw.items()}
-RUN_EXTRA=1/60   # running session's extra second
-TODAY=dt.date(2026,10,23); W0=dt.date(2026,8,3)
-def g(d,t): return M.get(d,{}).get(t,0)+(RUN_EXTRA if (t=='dw' and d==TODAY) else 0)
+EXTRA=1/60
+def g(d,t): return M.get(d,{}).get(t,0)+(EXTRA if (t=='dw' and d==TODAY) else 0)
 def week(k): return [W0+dt.timedelta(7*k+i) for i in range(7)]
 def wt(k,t=None): return sum((g(d,t) if t else sum(g(d,x) for x in TR)) for d in week(k))
-hm=lambda m: f"{int(m)//60}:{int(m)%60:02d}"
-cur=wt(11)
-print("this week", hm(cur), {t:hm(wt(11,t)) for t in TR})
-print("last week", hm(wt(10)), {t:hm(wt(10,t)) for t in TR})
+hm=lambda m: f"{int(m+1e-9)//60}:{int(m+1e-9)%60:02d}"
+def sd(m): return ('−' if m<0 else '+')+hm(abs(m))
+def pct(v,b): return f"{round((v-b)/b*100):+d}%".replace('+-','-')
+cur={t:wt(11,t) for t in TR}; last={t:wt(10,t) for t in TR}
+C=sum(cur.values()); L=sum(last.values())
+print("HERO", hm(C), ('↓' if C<L else '↑'), hm(abs(C-L)), pct(C,L).replace('-','−') if C<L else pct(C,L), "vs last week")
+for t in TR: print(f"  {NAME[t]:10s} {hm(cur[t]):>6} {hm(last[t]):>6} {sd(cur[t]-last[t]):>7}")
+print(f"  TOTAL      {hm(C):>6} {hm(L):>6} {sd(C-L):>7}")
+# split bars: width 400, gaps 2
+def split(parts,scale):
+    vis=[p for p in parts if p>0]; gaps=2*(len(vis)-1); raw=[p/scale*400 for p in vis]; s=sum(raw)
+    k=(400-gaps)/s if s+gaps>400 else 1
+    return [round(r*k,2) for r in raw]
+S=max(C,L)
+print("SPLIT this",split([cur[t] for t in TR],S),"last",split([last[t] for t in TR],S))
 weeks=[wt(k) for k in range(4,12)]
-print("trend", [round(w/max(weeks)*96) for w in weeks], "want [64,73,69,78,74,81,85,96]", "avg", hm(sum(weeks)/8), "want 29:42")
+print("TREND", [round(w/max(weeks)*96) for w in weeks], [hm(w) for w in weeks], "avg", hm(sum(weeks)/8))
 dws=[wt(k,'dw') for k in range(4,12)]
-print("04 bars", [min(101,round(w/1500*100)) for w in dws], "want [67,73,68,82,76,85,78,91]",
-      "vs avg(8)", f"{round((dws[-1]-sum(dws)/8)/(sum(dws)/8)*100):+d}%")
-# goal hits weekly
-def wfrac(k,t):
-    goal = GOAL[t] if t in('dw','mt') else (GOAL[t]*7 if t in('ex','em') else 9000/365*7)
-    return wt(k,t)/goal
-for t,design in [('dw','01011011111'),('mt','11011101111'),('rd','011011101111')]:
-    hits=''.join('1' if wfrac(k,t)>=1 else '0' for k in range(12))
-    print(t,"weekly hits",hits[:11],hits[11],"design",design)
-# daily series from Aug 3 to today
-days=[W0+dt.timedelta(i) for i in range((TODAY-W0).days+1)]
-def runs(s):
-    out=[];st=None
-    for i,v in enumerate(s+'0'):
-        if v=='1' and st is None: st=i
-        if v=='0' and st is not None: out.append((st,i-st)); st=None
-    return out
-for t,dots in [('ex','00010011111'),('em','01110011111')]:
-    s=''.join('1' if g(d,t)>=GOAL[t] else '0' for d in days)
-    r=runs(s[:-1] if s[-1]=='0' else s)
-    cur_=0
-    for v in reversed(s[:-1] if s[-1]=='0' else s):
-        if v=='1': cur_+=1
-        else: break
-    print(t,"dots",s[-12:-1],"design",dots,"cur",cur_,"best",max(l for _,l in r))
-    print("   lane",s)
+scale=max(1500,max(dws))
+print("04 bars", [round(w/scale*100) for w in dws], [hm(w) for w in dws], "goal line top", round(100-1500/scale*100,2),
+      "vs avg", pct(dws[-1],sum(dws)/8))
+print("04 hero", hm(cur['dw']), ('↓' if cur['dw']<last['dw'] else '↑'), hm(abs(cur['dw']-last['dw'])), pct(cur['dw'],last['dw']), "vs last week")
+RDW=9000/365*7
+def whit(t,k):
+    goal={'dw':1500,'mt':480,'rd':RDW}[t]; return wt(k,t)>=goal
+for t in ['dw','mt','rd']:
+    s=''.join('1' if whit(t,k) else '0' for k in range(11))
+    print(t,'weeks',s, 'hits',s.count('1'),'/11', f"{round(s.count('1')/11*100)}%")
+days=[W0+dt.timedelta(i) for i in range(82)]
+for t in ['ex','em']:
+    s=''.join('1' if g(d,t)>=GOAL[t] else '0' for d in days[:81])
+    print(t,'days',s,'dots Oct12-22',s[70:81])
+# line: by same point (Fri 20:56) using post
+post=J['post']
+for t,G in [('dw',1500),('mt',480),('ex',315)]:
+    vals=[]
+    for k in range(4,11):
+        s=sum(g(d,t) for d in week(k)[:5])-(post.get(str(k),{}).get(t,0) if t in('dw','mt') else 0)
+        vals.append(s/G)
+    vals.append(sum(g(d,t) for d in week(11)[:5])/G)
+    ys=[round(130-(v-0.5)*200,1) for v in vals]
+    print('line',t,[round(v,3) for v in vals],'y',ys)
 # heat
-D0=dt.date(2026,8,2)
-lv=[]
+T=1500/7+480/7+45+30+9000/365
+lv={}
 for j in range(83):
     d=D0+dt.timedelta(j); s=min(1,sum(g(d,x) for x in TR)/T)
-    l=0 if s<0.125 else 1 if s<0.25 else 2 if s<0.999 else 3
-    lv.append(l)
-diff=[( (D0+dt.timedelta(j)).strftime('%a %b %d'),HEAT[j],l) for j,l in enumerate(lv) if l!=HEAT[j]]
-print("perfect",lv.count(3),"heat diffs",diff)
-# line chart (prev weeks weekFraction; current = progress)
-for t in ['dw','ex','mt']:
-    vals=[round(wfrac(k,t)*100) for k in range(4,11)]
-    curp = wt(11,t)/GOAL[t] if t!='ex' else g(TODAY,'ex')/45
-    print("line",t,vals,round(curp*100))
-print("line design dw [72,80,76,88,70,84,64,91] ex [57,71,86,100,86,71,86,67] mt [70,62,80,75,60,72,50,68]")
-ytd=sum(g(d,'rd') for d in M if d.year==2026)
-print("reading ytd",hm(ytd))
-# sanity: no day > 16h
-for d in M:
-    if sum(M[d].values())>16*60: print("BIG DAY",d,M[d])
+    lv[d]=0 if s<0.125 else 1 if s<0.25 else 2 if s<0.99999 else 3
+print('perfect',sum(1 for v in lv.values() if v==3),'diffs vs design',[(d.strftime('%b %d'),HEAT[d],l) for d,l in lv.items() if l!=HEAT[d]])
+ytd=sum(v['rd'] for k,v in J['days'].items() if k.startswith('2026'))
+print('reading Aug-Oct',ytd,'rest for Jan-Jul',5770-ytd)

@@ -62,7 +62,8 @@ struct GoalResult: Hashable, Identifiable {
 }
 
 struct Streak: Hashable {
-    /// Consecutive hit periods ending with the last completed period (plus the current one if already hit).
+    /// Consecutive hit periods ending with the last completed period, plus the current one if already hit
+    /// (or, for daily goals, while today is still in progress after a hit day).
     let current: Int
     /// Longest run of consecutive hit periods in the scanned range.
     let best: Int
@@ -266,29 +267,32 @@ final class Store {
         }
     }
 
-    /// Streak in units of the tracker's period, scanning back `lookback` periods.
+    /// Streak in units of the tracker's period, scanning back `lookback` periods. Same rule as `GoalSeries`:
+    /// a daily streak includes today while it's in progress (yesterday hit); other periods count once hit.
     func streak(for activity: Activity, lookback: Int = 120, now: Date) -> Streak {
         let history = goalHistory(for: activity, count: lookback, now: now)
+        func counts(_ i: Int) -> Bool {
+            history[i].hit || (activity.period == .day && history[i].isCurrent && i > 0 && history[i - 1].hit)
+        }
         var runs: [DateInterval] = []
         var run: DateInterval?
         var best = 0, length = 0
-        for r in history {
-            if r.hit {
+        for i in history.indices {
+            if counts(i) {
                 length += 1
-                run = run.map { DateInterval(start: $0.start, end: r.interval.end) } ?? r.interval
+                run = run.map { DateInterval(start: $0.start, end: history[i].interval.end) } ?? history[i].interval
                 best = max(best, length)
-            } else if !r.isCurrent {
+            } else {
                 if let run { runs.append(run) }
                 run = nil
                 length = 0
             }
         }
         if let run { runs.append(run) }
-        // Current: trailing hits, ignoring an unfinished, not-yet-hit current period.
         var current = 0
-        for r in history.reversed() {
-            if r.isCurrent && !r.hit { continue }
-            if r.hit { current += 1 } else { break }
+        for i in history.indices.reversed() {
+            if history[i].isCurrent && !counts(i) { continue }
+            if counts(i) { current += 1 } else { break }
         }
         return Streak(current: current, best: best, runs: runs)
     }
