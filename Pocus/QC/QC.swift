@@ -10,6 +10,7 @@ enum AppScreen: String, CaseIterable {
 ///   -QCScreen <home|detail|stats|trackerStats|newTracker>   open that screen directly
 ///   -QCDemo                                                  in-memory demo data + frozen now (Fri 23 Oct 2026 20:56:01)
 ///   -QCSnapshot                                              ~1.5s after layout, write Documents/qc-<screen>.png
+///   -QCFullPage                                              (stats/trackerStats) also write qc-<screen>-full.png, full scroll height
 enum QC {
     private static let args = ProcessInfo.processInfo.arguments
 
@@ -20,6 +21,8 @@ enum QC {
 
     static let demo = args.contains("-QCDemo")
     static let snapshot = args.contains("-QCSnapshot")
+    /// With -QCSnapshot: long scrolling screens also write qc-<screen>-full.png at full content height.
+    static let fullPage = args.contains("-QCFullPage")
 
     /// Snapshot file name: qc-<screen>.png (qc-app.png when no -QCScreen).
     static var snapshotName: String { "qc-\(screen?.rawValue ?? "app").png" }
@@ -61,6 +64,24 @@ enum QC {
             return url
         } catch {
             log("QC snapshot failed: \(error)")
+            return nil
+        }
+    }
+
+    /// Renders `view` (already sized) with ImageRenderer at the screen scale and writes Documents/<name>.
+    @MainActor @discardableResult
+    static func writeFullPage<V: View>(_ view: V, name: String) -> URL? {
+        let renderer = ImageRenderer(content: view.environment(\.colorScheme, .dark))
+        renderer.scale = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first?.screen.scale ?? 3
+        renderer.isOpaque = true
+        guard let data = renderer.uiImage?.pngData() else { log("QC full page: render failed"); return nil }
+        let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent(name)
+        do {
+            try data.write(to: url, options: .atomic)
+            log("QC full page written: \(url.path)")
+            return url
+        } catch {
+            log("QC full page failed: \(error)")
             return nil
         }
     }
