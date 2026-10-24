@@ -261,7 +261,7 @@
 				DEVELOPMENT_TEAM = QBWSX5JLV3;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = Pocus.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Pocus.entitlements;
 				INFOPLIST_FILE = "Pocus-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Chopped;
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
@@ -293,7 +293,7 @@
 				DEVELOPMENT_TEAM = QBWSX5JLV3;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = Pocus.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Pocus.entitlements;
 				INFOPLIST_FILE = "Pocus-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Chopped;
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
@@ -323,7 +323,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = QBWSX5JLV3;
 				GENERATE_INFOPLIST_FILE = YES;
-				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = PocusWidgets.entitlements;
+				CODE_SIGN_ENTITLEMENTS = PocusWidgets.entitlements;
 				INFOPLIST_FILE = "PocusWidgets-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Chopped;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -348,7 +348,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = QBWSX5JLV3;
 				GENERATE_INFOPLIST_FILE = YES;
-				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = PocusWidgets.entitlements;
+				CODE_SIGN_ENTITLEMENTS = PocusWidgets.entitlements;
 				INFOPLIST_FILE = "PocusWidgets-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Chopped;
 				LD_RUNPATH_SEARCH_PATHS = (
