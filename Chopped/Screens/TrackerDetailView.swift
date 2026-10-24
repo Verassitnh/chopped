@@ -25,8 +25,9 @@ struct TrackerDetailView: View {
                     // Same edge-to-edge 05 sheet as the home "+", over the detail.
                     .newTrackerOverlay(isPresented: $editingTracker, editing: a)
                     .sensoryFeedback(.impact(weight: .light), trigger: editingTracker) { _, open in open }
-                    .confirmationDialog("Delete \(a.name)?", isPresented: $confirmingDelete, titleVisibility: .visible) {
-                        Button("Delete Tracker", role: .destructive) { delete(a) }
+                    .alert("Delete \(a.name)?", isPresented: $confirmingDelete) {
+                        Button("Delete", role: .destructive) { delete(a) }
+                        Button("Cancel", role: .cancel) {}
                     } message: {
                         Text("All of its time entries will be deleted too.")
                     }

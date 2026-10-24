@@ -7,35 +7,66 @@ struct HomeView: View {
     @Environment(Store.self) private var store
     @Environment(AppRouter.self) private var router
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var pendingDelete: Activity?
 
     var body: some View {
         Ticker { now in
-            ScrollView {
-                VStack(spacing: 0) {
-                    header(now: now)
-                    VStack(spacing: 14) {
-                        ForEach(store.activities) { a in
-                            // The card is a Button (press feedback: 0.98 spring, off with Reduce Motion); its
-                            // Play/Stop are separate Buttons inside the label, so they take their own taps.
-                            Button { router.openDetail(a.id) } label: {
-                                TrackerCard(activity: a, now: now,
-                                            start: { toggle { store.clockIn(a) } },
-                                            stop: { toggle { store.stop() } })
-                                    .contentShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
-                            }
-                            .buttonStyle(PressScaleStyle(scale: 0.98))
-                            .accessibilityHint("Opens tracker details")
-                        }
-                        if store.activities.isEmpty { emptyState }
+            // A plain List (styled to look like the stacked cards) so each card gets the native
+            // swipe-left-to-delete gesture alongside normal vertical scrolling.
+            List {
+                header(now: now)
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                ForEach(Array(store.activities.enumerated()), id: \.element.id) { index, a in
+                    // The card is a Button (press feedback: 0.98 spring, off with Reduce Motion); its
+                    // Play/Stop are separate Buttons inside the label, so they take their own taps.
+                    Button { router.openDetail(a.id) } label: {
+                        TrackerCard(activity: a, now: now,
+                                    start: { toggle { store.clockIn(a) } },
+                                    stop: { toggle { store.stop() } })
+                            .contentShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.top, 4)
-                    .padding(.bottom, 24)
+                    .buttonStyle(PressScaleStyle(scale: 0.98))
+                    .accessibilityHint("Opens tracker details")
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button { pendingDelete = a } label: { Label("Delete", systemImage: "trash.fill") }
+                            .tint(Color(hex: "#FF453A"))
+                    }
+                    // 14pt between cards (7 + 7), 4pt above the first, 24pt below the last.
+                    .listRowInsets(EdgeInsets(top: index == 0 ? 4 : 7, leading: 12,
+                                              bottom: index == store.activities.count - 1 ? 24 : 7, trailing: 12))
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                }
+                if store.activities.isEmpty {
+                    emptyState
+                        .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 24, trailing: 12))
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
                 }
             }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .environment(\.defaultMinListRowHeight, 0)
             .scrollIndicators(.hidden)
         }
         .background(CH.bg)
+        .alert("Delete \(pendingDelete?.name ?? "tracker")?",
+               isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
+               presenting: pendingDelete) { a in
+            Button("Delete", role: .destructive) { delete(a) }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text("All of its time entries will be deleted too.")
+        }
+    }
+
+    private func delete(_ a: Activity) {
+        withAnimation(reduceMotion ? nil : Motion.spring) {
+            if store.isRunning(a.id) { store.stop() }
+            store.deleteActivity(a)
+        }
     }
 
     private func toggle(_ change: () -> Void) {
