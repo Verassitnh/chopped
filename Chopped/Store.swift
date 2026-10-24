@@ -475,6 +475,13 @@ final class Store {
 
     private func seedIfNeeded() {
         guard !UserDefaults.standard.bool(forKey: "seeded") else { return }
+        // Only seed a brand-new store: data migrated from the Pocus app (or any existing database) already has
+        // trackers, and the per-app "seeded" flag doesn't carry over to a new bundle ID.
+        let existing = db.query("SELECT COUNT(*) FROM activities") { $0.int(0) }.first ?? 0
+        guard existing == 0 else {
+            UserDefaults.standard.set(true, forKey: "seeded")
+            return
+        }
         for (position, d) in Store.defaultTrackers.enumerated() {
             db.execute("INSERT INTO activities (name, color, position, icon, goal_minutes, period) VALUES (?, ?, ?, ?, ?, ?)",
                        [d.name, d.color.accentHex, position, d.icon.rawValue, d.goalMinutes, d.period.rawValue])
