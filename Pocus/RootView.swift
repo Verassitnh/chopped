@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Top level: Track / Stats tabs with the floating glass tab bar, plus the app's sheets.
 /// Screens live in Pocus/Screens/*.swift; navigation state lives in `AppRouter`.
@@ -35,6 +36,24 @@ struct RootView: View {
             TrackerDetailView(activityID: id)
         }
         .newTrackerOverlay(isPresented: $router.showingNewTracker)
+        .task {
+            // -QCScreen detail: present once the scene is active and on screen (device launches are slower).
+            guard let id = router.qcPendingDetailID else { return }
+            router.qcPendingDetailID = nil
+            for _ in 0..<40 where UIApplication.shared.applicationState != .active {
+                try? await Task.sleep(for: .seconds(0.1))
+            }
+            try? await Task.sleep(for: .seconds(0.3))
+            router.detailActivityID = id
+            // If UIKit dropped the presentation, try once more.
+            try? await Task.sleep(for: .seconds(1.5))
+            if !QC.sheetPresented {
+                QC.log("QC detail sheet not presented, retrying")
+                router.detailActivityID = nil
+                try? await Task.sleep(for: .seconds(0.2))
+                router.detailActivityID = id
+            }
+        }
     }
 }
 
@@ -50,10 +69,18 @@ struct GlassTabBar: View {
         .padding(4)
         .frame(width: 188, height: 62)
         .background {
-            Capsule().fill(.ultraThinMaterial)
-                .overlay(Capsule().fill(Color.white.opacity(0.08)))
-                .overlay(Capsule().strokeBorder(Color.white.opacity(0.14), lineWidth: 1))
-                .shadow(color: .black.opacity(0.5), radius: 15, y: 10)
+            // Paper AL8-0: blur 24, #FFFFFF14 fill, #FFFFFF24 border, #FFFFFF33 inset top, #00000080 0 10 30.
+            GlassSurface(shape: Capsule(), fill: .white.opacity(0x14 / 255.0), highlight: .white.opacity(0.2))
+                .background {
+                    // CSS box-shadow is only drawn outside the box, so the translucent glass isn't darkened.
+                    Capsule().fill(.black)
+                        .shadow(color: .black.opacity(0.5), radius: 15, y: 10)
+                        .mask {
+                            Rectangle().padding(-60)
+                                .overlay(Capsule().blendMode(.destinationOut))
+                                .compositingGroup()
+                        }
+                }
         }
     }
 

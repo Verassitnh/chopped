@@ -418,9 +418,7 @@ struct GlassPill: View {
             .padding(.horizontal, 12)
             .frame(height: 32)
             .background {
-                Capsule().fill(.ultraThinMaterial)
-                    .overlay(Capsule().fill(CH.glassFill))
-                    .overlay(Capsule().strokeBorder(CH.glassStroke, lineWidth: 1))
+                GlassSurface(shape: Capsule())   // #FFFFFF17 fill, #FFFFFF24 border, #FFFFFF2E inset top
             }
             .contentShape(Capsule())
         }

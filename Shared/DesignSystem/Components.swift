@@ -260,14 +260,7 @@ struct GlassCircleButton: View {
 
     var body: some View {
         OptionalButton(action: action) {
-            Circle()
-                .fill(.ultraThinMaterial)
-                .overlay(Circle().fill(CH.glassFill))
-                .overlay(Circle().strokeBorder(CH.glassStroke, lineWidth: 1))
-                .overlay(alignment: .top) {
-                    // 1pt inset highlight along the top edge.
-                    Circle().trim(from: 0.6, to: 0.9).stroke(CH.glassHighlight, lineWidth: 1).padding(1)
-                }
+            GlassSurface(shape: Circle())
                 .frame(width: size, height: size)
                 .overlay { GlyphView(glyph, size: glyphSize, color: .white) }
                 .contentShape(Circle())

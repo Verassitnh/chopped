@@ -341,6 +341,12 @@ The designs contradict each other, so these values are computed from the data, n
 - **Info.plists.** The app uses `GENERATE_INFOPLIST_FILE` and `INFOPLIST_FILE = Pocus-Info.plist` together. They merge, and the plist only holds `UIAppFonts`. Add new keys as `INFOPLIST_KEY_*` build settings where one exists. Keep both plists at the repo root: inside a synchronized folder they'd be copied as resources.
 - **App settings.** Display name is `Chopped` (app and widget extension). `UIUserInterfaceStyle = Dark` is set, plus `.preferredColorScheme(.dark)`.
 - **Font files are flat.** They're copied into the bundle root. The `UIAppFonts` entries are bare filenames.
+- **Ref PNGs are Display P3.** `design/refs/*.png` carry a "Display P3 Gamut with sRGB Transfer" ICC profile, so the raw
+  pixel values are P3-encoded (Paper `#006D32` is stored as ~`#2E6B38`, `#4A8BE5` as ~`#5A89DE`). Viewers that ignore the
+  profile make the refs look muted next to app snapshots (which are sRGB). Convert before comparing pixels:
+  `PIL.ImageCms.profileToProfile(im, <embedded profile>, sRGB)`. After conversion, every fill matches Paper exactly.
+- **Glass.** Use `GlassSurface(shape:)` (Shared/DesignSystem/GlassSurface.swift), not `.ultraThinMaterial`: the material's
+  luminance curve lifts #0C0C0E by ~27 levels, so the glass read twice as bright as Paper's `blur + #FFFFFF17`.
 - **Sim snapshot colours.** Simulator snapshots render accents slightly lighter/desaturated compared with device snapshots. Judge colour on the device PNG.
 - **Live Activity state.** `PocusActivityAttributes.ContentState` gained optional `icon`, `periodBase`, `goalMinutes` and `period`. For the lock screen and DI: "22:49 / 25:00" = `periodBase` + elapsed since `start`.
 - **Font metrics.** `TypeStyle` reads the natural line height from `UIFont`. If a font ever fails to register, the text falls back to the system font and spacing drifts. Check `missingFonts=[]` in the log.

@@ -14,6 +14,9 @@ final class AppRouter {
     var showingNewTracker = false
     /// Stats navigation stack; push a tracker id to show Tracker Stats (04).
     var statsPath: [Int64] = []
+    /// `-QCScreen detail`: presented by RootView once its window is on screen. Setting `detailActivityID`
+    /// before the window exists can drop the sheet on device (the presenter isn't in the hierarchy yet).
+    var qcPendingDetailID: Int64?
 
     func openDetail(_ id: Int64) { detailActivityID = id }
     func openTrackerStats(_ id: Int64) {
@@ -27,7 +30,7 @@ final class AppRouter {
         let target = store.activeActivity?.id ?? store.activities.first?.id
         switch screen {
         case .home: tab = .track
-        case .detail: tab = .track; detailActivityID = target
+        case .detail: tab = .track; qcPendingDetailID = target
         case .stats: tab = .stats
         case .trackerStats: tab = .stats; statsPath = target.map { [$0] } ?? []
         case .newTracker: tab = .track; showingNewTracker = true

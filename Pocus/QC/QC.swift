@@ -41,6 +41,15 @@ enum QC {
         return DemoData.makeStore()
     }
 
+    /// True once the key window's root controller has a presented (sheet) controller that finished animating.
+    @MainActor static var sheetPresented: Bool {
+        let windows = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap(\.windows)
+        return windows.contains { w in
+            guard let p = w.rootViewController?.presentedViewController else { return false }
+            return !p.isBeingPresented && p.viewIfLoaded?.window != nil
+        }
+    }
+
     /// Writes the key window to Documents/<name> at native scale. Returns the file URL.
     @MainActor @discardableResult
     static func writeSnapshot(name: String = QC.snapshotName) -> URL? {
@@ -100,6 +109,15 @@ struct QCSnapshotTrigger: ViewModifier {
         content.task {
             guard QC.snapshot else { return }
             try? await Task.sleep(for: .seconds(delay))
+            if QC.screen == .detail {
+                // Device launches can be slower than the simulator: wait (up to 6s more) for the sheet to be up.
+                var waited = 0.0
+                while !QC.sheetPresented, waited < 6 {
+                    try? await Task.sleep(for: .seconds(0.25)); waited += 0.25
+                }
+                if waited > 0 { try? await Task.sleep(for: .seconds(0.8)) }   // let the presentation settle
+                QC.log("QC sheet presented=\(QC.sheetPresented) after +\(waited)s")
+            }
             QC.writeSnapshot()
         }
     }
