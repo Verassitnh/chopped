@@ -5,7 +5,8 @@ import Foundation
 enum LiveActivityController {
     private typealias ClockIn = ActivityKit.Activity<PocusActivityAttributes>
 
-    static func sync(session: WorkSession?, activity: Activity?) {
+    /// - Parameter periodBase: seconds already logged in the tracker's current goal period, excluding the running session.
+    static func sync(session: WorkSession?, activity: Activity?, periodBase: TimeInterval? = nil) {
         let running = ClockIn.activities.filter { $0.activityState == .active || $0.activityState == .stale }
 
         guard let session, let activity else {
@@ -15,7 +16,9 @@ enum LiveActivityController {
             return
         }
 
-        let state = PocusActivityAttributes.ContentState(name: activity.name, colorHex: activity.colorHex, start: session.start)
+        let state = PocusActivityAttributes.ContentState(
+            name: activity.name, colorHex: activity.colorHex, start: session.start,
+            icon: activity.icon, periodBase: periodBase, goalMinutes: activity.goalMinutes, period: activity.period.rawValue)
         let content = ActivityContent(state: state, staleDate: nil)
 
         if let current = running.first {

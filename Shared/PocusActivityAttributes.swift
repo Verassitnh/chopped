@@ -8,14 +8,11 @@ struct PocusActivityAttributes: ActivityAttributes {
         var name: String
         var colorHex: String
         var start: Date
-    }
-}
-
-extension Color {
-    init(hex: String) {
-        let value = UInt64(hex.trimmingCharacters(in: CharacterSet(charactersIn: "#")), radix: 16) ?? 0
-        self.init(red: Double((value >> 16) & 0xFF) / 255,
-                  green: Double((value >> 8) & 0xFF) / 255,
-                  blue: Double(value & 0xFF) / 255)
+        // Added for the Chopped redesign. Optional so older encoded states still decode.
+        var icon: String? = nil
+        /// Seconds already logged in the current goal period, *excluding* the running session.
+        var periodBase: TimeInterval? = nil
+        var goalMinutes: Int? = nil
+        var period: String? = nil
     }
 }

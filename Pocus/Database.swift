@@ -7,11 +7,17 @@ private let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.sel
 final class Database {
     private var db: OpaquePointer?
 
-    init(url: URL = Database.defaultURL) {
-        guard sqlite3_open(url.path, &db) == SQLITE_OK else {
-            fatalError("Could not open database at \(url.path)")
+    /// Current schema version (PRAGMA user_version).
+    static let schemaVersion: Int32 = 1
+
+    convenience init(url: URL = Database.defaultURL) { self.init(path: url.path) }
+
+    init(path: String) {
+        guard sqlite3_open(path, &db) == SQLITE_OK else {
+            fatalError("Could not open database at \(path)")
         }
         execute("PRAGMA foreign_keys = ON")
+        // v0 schema (the original Pocus tables). Kept as-is so existing installs open unchanged.
         execute("""
             CREATE TABLE IF NOT EXISTS activities (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -29,7 +35,11 @@ final class Database {
             )
             """)
         execute("CREATE INDEX IF NOT EXISTS sessions_start ON sessions(start)")
+        migrate()
     }
+
+    /// In-memory database (QC demo mode).
+    static func inMemory() -> Database { Database(path: ":memory:") }
 
     deinit { sqlite3_close(db) }
 
@@ -38,6 +48,45 @@ final class Database {
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir.appendingPathComponent("pocus.sqlite")
     }
+
+    // MARK: Migrations (additive only — never drops data)
+
+    private func migrate() {
+        var version = query("PRAGMA user_version") { Int32($0.int(0)) }.first ?? 0
+        if version < 1 {
+            execute("BEGIN")
+            let columns = Set(query("PRAGMA table_info(activities)") { $0.text(1) })
+            if !columns.contains("icon") {
+                execute("ALTER TABLE activities ADD COLUMN icon TEXT NOT NULL DEFAULT 'target'")
+            }
+            if !columns.contains("goal_minutes") {
+                execute("ALTER TABLE activities ADD COLUMN goal_minutes INTEGER NOT NULL DEFAULT 600")
+            }
+            if !columns.contains("period") {
+                execute("ALTER TABLE activities ADD COLUMN period TEXT NOT NULL DEFAULT 'week'")
+            }
+            // Give the original default trackers their Chopped icon/goal/colour.
+            for d in Store.defaultTrackers {
+                execute("UPDATE activities SET icon = ?, goal_minutes = ?, period = ? WHERE name = ?",
+                        [d.icon.rawValue, d.goalMinutes, d.period.rawValue, d.name])
+            }
+            // Old Pocus palette → nearest Chopped accent.
+            for (old, new) in Database.legacyColorMap {
+                execute("UPDATE activities SET color = ? WHERE upper(color) = ?", [new, old])
+            }
+            execute("PRAGMA user_version = 1")
+            execute("COMMIT")
+            version = 1
+        }
+    }
+
+    static let legacyColorMap: [(String, String)] = [
+        ("#3A7BD5", "#4A8BE5"), ("#56CCF2", "#4A8BE5"), ("#11998E", "#1DB3A6"), ("#6FCF97", "#7CCB8E"),
+        ("#F2C94C", "#E9C95A"), ("#F7971E", "#F7A23A"), ("#EB5757", "#EF6B6B"), ("#FF6FB5", "#F07EB8"),
+        ("#8E54E9", "#9D68F0"), ("#828282", "#4A8BE5"),
+    ]
+
+    // MARK: Statements
 
     /// Runs a statement and returns the last inserted row id.
     @discardableResult
@@ -59,6 +108,13 @@ final class Database {
             rows.append(map(Row(stmt: stmt)))
         }
         return rows
+    }
+
+    /// Runs `body` inside a transaction (bulk inserts, e.g. demo seeding).
+    func transaction(_ body: () -> Void) {
+        execute("BEGIN")
+        body()
+        execute("COMMIT")
     }
 
     private func prepare(_ sql: String, _ params: [Any?]) -> OpaquePointer? {
