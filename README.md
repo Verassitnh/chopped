@@ -1,4 +1,4 @@
-# Chopped: Focus Time
+# Chopped: Time Tracker
 
 A minimal iOS time tracker. Clock in to what matters, see where the week went, and keep your streaks alive from the Lock Screen, the Dynamic Island and home-screen widgets.
 
