@@ -50,9 +50,13 @@ struct HomeView: View {
                 Text(Self.dateLine(now))
                     .geist(13, .medium, lineHeight: 16)
                     .foregroundStyle(CH.textSecondary)
-                Text("lock in twin")
+                let tagline = Tagline.forDay(now)
+                Text(tagline)
                     .geist(20, .medium, tracking: -0.02, lineHeight: 26)
                     .foregroundStyle(CH.textMuted)
+                    .lineLimit(1)
+                    .contentTransition(.opacity)   // crossfade when the day rolls over while open
+                    .animation(.easeInOut(duration: 0.4), value: tagline)
             }
             .frame(height: 46)   // 16 + 4 + 26, pinned so fractional line-height padding can't drift
             Spacer(minLength: 12)
