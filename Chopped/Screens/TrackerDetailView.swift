@@ -287,24 +287,37 @@ private struct DetailHeader: View {
                         .animation(.snappy(duration: 0.25), value: Int(running ? elapsed : total))
                 }
 
-                VStack(spacing: 10) {
-                    SegmentStrip(fraction: store.progress(for: a, now: now), accent: .black,
-                                 unfilled: Color.black.opacity(0.16))
-                    HStack(spacing: 12) {
-                        HStack(alignment: .firstTextBaseline, spacing: 5) {
-                            Text(Fmt.hm(total))
-                                .geistMono(15, .medium, tracking: -0.05, lineHeight: 19)
-                                .foregroundStyle(CH.onAccent)
-                                .contentTransition(.numericText())
-                            Text("of \(Fmt.goal(minutes: a.goalMinutes))")
-                                .geistMono(12, .medium, tracking: -0.02, lineHeight: 16)
+                if a.hasGoal {
+                    VStack(spacing: 10) {
+                        SegmentStrip(fraction: store.progress(for: a, now: now), accent: .black,
+                                     unfilled: Color.black.opacity(0.16))
+                        HStack(spacing: 12) {
+                            HStack(alignment: .firstTextBaseline, spacing: 5) {
+                                Text(Fmt.hm(total))
+                                    .geistMono(15, .medium, tracking: -0.05, lineHeight: 19)
+                                    .foregroundStyle(CH.onAccent)
+                                    .contentTransition(.numericText())
+                                Text("of \(Fmt.goal(minutes: a.goalMinutes))")
+                                    .geistMono(12, .medium, tracking: -0.02, lineHeight: 16)
+                                    .foregroundStyle(Color.black.opacity(0.55))
+                            }
+                            Spacer()
+                            Text(remainingLine(a))
+                                .geist(13, .medium, lineHeight: 17)
                                 .foregroundStyle(Color.black.opacity(0.55))
                         }
-                        Spacer()
-                        Text(remainingLine(a))
-                            .geist(13, .medium, lineHeight: 17)
+                    }
+                } else if running {
+                    HStack(alignment: .firstTextBaseline, spacing: 5) {
+                        Text(Fmt.hm(total))
+                            .geistMono(15, .medium, tracking: -0.05, lineHeight: 19)
+                            .foregroundStyle(CH.onAccent)
+                            .contentTransition(.numericText())
+                        Text(a.period.current)
+                            .geistMono(12, .medium, tracking: -0.02, lineHeight: 16)
                             .foregroundStyle(Color.black.opacity(0.55))
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 Button(action: toggle) {

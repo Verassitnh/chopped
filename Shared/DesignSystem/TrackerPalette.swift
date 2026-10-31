@@ -60,6 +60,12 @@ enum GoalPeriod: String, CaseIterable, Identifiable, Codable {
         }
     }
 
+    var current: String { self == .day ? "today" : "this \(rawValue)" }
+
+    func goalLine(minutes: Int) -> String {
+        minutes > 0 ? "\(adjective) · \(Fmt.goal(minutes: minutes)) goal" : "\(adjective) · No goal"
+    }
+
     /// "DAY" / "WEEK" … (Track-per segmented control).
     var segmentLabel: String { rawValue.uppercased() }
 

@@ -37,6 +37,7 @@ enum QC {
     }
 
     static let over = args.contains("-QCOver")
+    static let noGoal = args.contains("-QCNoGoal")
 
     static let crossIn: TimeInterval? = {
         guard let i = args.firstIndex(of: "-QCCrossIn"), i + 1 < args.count else { return nil }
@@ -47,6 +48,7 @@ enum QC {
         guard demo else { return Store() }
         let store = DemoData.makeStore()
         if over { DemoData.putOverGoal(store) }
+        if noGoal { DemoData.removeGoals(store) }
         if let crossIn, let crossing = DemoData.crossSoon(store) {
             AppClock.frozen = nil
             AppClock.offset = crossing.addingTimeInterval(-crossIn).timeIntervalSince(Date())

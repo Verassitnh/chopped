@@ -127,10 +127,12 @@ struct StatsPage: View {
                 .padding(.top, 36)
             section(top: 36) { HoursByTracker(range: range, rows: rows, width: w, now: now) }
             section(top: 44) { WeekTrend(now: now) }
-            section(top: 44) { GoalCards(now: now) }
-            section(top: 48) { GoalPercentChart(width: w, now: now) }
-            section(top: 48) { ConsistencyHeatmap(width: w, now: now) }
-            section(top: 48) { StreakLanes(width: w, now: now) }
+            if store.activities.contains(where: \.hasGoal) {
+                section(top: 44) { GoalCards(now: now) }
+                section(top: 48) { GoalPercentChart(width: w, now: now) }
+                section(top: 48) { ConsistencyHeatmap(width: w, now: now) }
+                section(top: 48) { StreakLanes(width: w, now: now) }
+            }
         }
         .frame(width: width, alignment: .leading)
     }
@@ -241,8 +243,9 @@ private struct HoursByTracker: View {
     var body: some View {
         let current = rows.reduce(0) { $0 + $1.current }
         let last = rows.reduce(0) { $0 + $1.last }
-        let onPace = store.trackers.filter { store.isOnPace($0, now: now) }.count
-        SectionLabel("Hours by tracker", value: "\(onPace)/\(store.trackers.count) on pace").frame(height: 16)
+        let goalTrackers = store.trackers.filter(\.hasGoal)
+        let onPace = goalTrackers.filter { store.isOnPace($0, now: now) }.count
+        SectionLabel("Hours by tracker", value: goalTrackers.isEmpty ? nil : "\(onPace)/\(goalTrackers.count) on pace").frame(height: 16)
         GrowGroup { grown in
             VStack(alignment: .leading, spacing: 6) {
                 splitBar(rows.map { ($0.activity.color.accent, $0.current) }, scale: max(current, last), height: 10, grown: grown)
@@ -394,7 +397,7 @@ private struct GoalCards: View {
     let now: Date
 
     var body: some View {
-        let list = store.activities.filter { !$0.isCompleted || store.periodTotal(for: $0, now: now) > 0 }
+        let list = store.activities.filter { $0.hasGoal && (!$0.isCompleted || store.periodTotal(for: $0, now: now) > 0) }
         SectionLabel(title: "Goals") { SectionValueText("tap for detail", color: StatsColor.dim) }.frame(height: 16)
         VStack(spacing: 12) {
             ForEach(Array(stride(from: 0, to: list.count, by: 2)), id: \.self) { i in
@@ -669,6 +672,7 @@ private struct StreakLanes: View {
         let start = store.intervals(.week, count: 12, endingAt: now)[0].start
         let elapsedDays = (Calendar.chopped.dateComponents([.day], from: start, to: Store.day(containing: now).start).day ?? 0) + 1
         let lanes = store.statsTrackers(in: DateInterval(start: start, end: Store.week(containing: now).end), now: now)
+            .filter(\.hasGoal)
             .map { a in Lane(activity: a, series: store.goalSeries(for: a, count: a.period == .day ? elapsedDays : 12, now: now)) }
             .enumerated()
             .sorted { l, r in

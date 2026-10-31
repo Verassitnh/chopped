@@ -135,6 +135,7 @@ struct TrackerSnapshot: Identifiable, Hashable {
     var color: TrackerColor { TrackerColor.forHex(colorHex) }
     var glyph: Glyph { Glyph.tracker(icon) }
     var goal: TimeInterval { TimeInterval(goalMinutes * 60) }
+    var hasGoal: Bool { goalMinutes > 0 }
     var isRunning: Bool { runningStart != nil }
 
     /// Logged in the current period at `now`, including the running session.

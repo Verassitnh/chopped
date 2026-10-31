@@ -18,6 +18,7 @@ struct NewTrackerView: View {
     @State private var color: TrackerColor
     @State private var period: GoalPeriod
     @State private var goalMinutes: Int
+    @State private var hasGoal: Bool
     @FocusState private var nameFocused: Bool
     @Namespace private var segment
 
@@ -29,7 +30,8 @@ struct NewTrackerView: View {
             _icon = State(initialValue: a.glyph)
             _color = State(initialValue: a.color)
             _period = State(initialValue: a.period)
-            _goalMinutes = State(initialValue: a.goalMinutes)
+            _goalMinutes = State(initialValue: a.hasGoal ? a.goalMinutes : Self.defaultGoal(a.period))
+            _hasGoal = State(initialValue: a.hasGoal)
         } else if QC.demo && QC.screen == .newTracker {
             // Matches the design (Guitar · music · pink · daily 30m).
             _name = State(initialValue: "Guitar")
@@ -37,12 +39,14 @@ struct NewTrackerView: View {
             _color = State(initialValue: .pink)
             _period = State(initialValue: .day)
             _goalMinutes = State(initialValue: 30)
+            _hasGoal = State(initialValue: !QC.noGoal)
         } else {
             _name = State(initialValue: "")
             _icon = State(initialValue: .target)
             _color = State(initialValue: .blue)
             _period = State(initialValue: .day)
             _goalMinutes = State(initialValue: Self.defaultGoal(.day))
+            _hasGoal = State(initialValue: true)
         }
     }
 
@@ -152,7 +156,7 @@ struct NewTrackerView: View {
                     }
                 VStack(alignment: .leading, spacing: 2) {
                     nameField
-                    Text("\(period.adjective) · \(Fmt.goal(minutes: goalMinutes)) goal")
+                    Text(period.goalLine(minutes: savedGoal))
                         .geist(14, .medium, lineHeight: 18)
                         .foregroundStyle(Color.black.opacity(0.6))
                         .contentTransition(.numericText())
@@ -275,22 +279,37 @@ struct NewTrackerView: View {
     }
 
     private var goalSection: some View {
-        HStack(alignment: .bottom) {
-            VStack(alignment: .leading, spacing: 6) {
-                SectionLabelText("Goal per \(period.rawValue)")
-                Text(Fmt.hm(TimeInterval(goalMinutes * 60)))
-                    .geistMono(36, .medium, tracking: -0.04, lineHeight: 40)
-                    .foregroundStyle(CH.text)
-                    .contentTransition(.numericText())
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                SectionLabelText(hasGoal ? "Goal per \(period.rawValue)" : "Goal")
+                Spacer()
+                Toggle("Goal", isOn: $hasGoal.animation(anim))
+                    .labelsHidden()
+                    .tint(color.accent)
             }
-            Spacer()
-            HStack(spacing: 10) {
-                CircleIconButton(glyph: .minus, glyphSize: 14) { step(-1) }
-                    .disabled(goalMinutes <= Self.step(period))
-                    .accessibilityLabel("Decrease goal")
-                CircleIconButton(glyph: .plus, glyphSize: 14) { step(1) }
-                    .disabled(goalMinutes >= Self.maxGoal(period))
-                    .accessibilityLabel("Increase goal")
+            if hasGoal {
+                HStack {
+                    Text(Fmt.hm(TimeInterval(goalMinutes * 60)))
+                        .geistMono(36, .medium, tracking: -0.04, lineHeight: 40)
+                        .foregroundStyle(CH.text)
+                        .contentTransition(.numericText())
+                    Spacer()
+                    HStack(spacing: 10) {
+                        CircleIconButton(glyph: .minus, glyphSize: 14) { step(-1) }
+                            .disabled(goalMinutes <= Self.step(period))
+                            .accessibilityLabel("Decrease goal")
+                        CircleIconButton(glyph: .plus, glyphSize: 14) { step(1) }
+                            .disabled(goalMinutes >= Self.maxGoal(period))
+                            .accessibilityLabel("Increase goal")
+                    }
+                }
+                .transition(.opacity)
+            } else {
+                Text("No target. Counts up like a stopwatch.")
+                    .geist(15, .medium, lineHeight: 20)
+                    .foregroundStyle(CH.textSecondary)
+                    .frame(minHeight: 40, alignment: .leading)
+                    .transition(.opacity)
             }
         }
     }
@@ -345,6 +364,8 @@ struct NewTrackerView: View {
 
     // MARK: Save
 
+    private var savedGoal: Int { hasGoal ? goalMinutes : 0 }
+
     private func save() {
         guard canSave else { return }
         if var a = editing {
@@ -352,11 +373,11 @@ struct NewTrackerView: View {
             a.icon = icon.rawValue
             a.colorHex = color.accentHex
             a.period = period
-            a.goalMinutes = goalMinutes
+            a.goalMinutes = savedGoal
             store.updateActivity(a)
         } else {
             store.addActivity(name: trimmedName, colorHex: color.accentHex, icon: icon,
-                              goalMinutes: goalMinutes, period: period)
+                              goalMinutes: savedGoal, period: period)
         }
         close()
     }

@@ -29,6 +29,14 @@ enum DemoData {
         }
     }
 
+    static func removeGoals(_ store: Store) {
+        for name in ["Deep Work", "Email"] {
+            guard var a = store.activities.first(where: { $0.name == name }) else { continue }
+            a.goalMinutes = 0
+            store.updateActivity(a)
+        }
+    }
+
     static func crossSoon(_ store: Store) -> Date? {
         guard var a = store.activities.first(where: { $0.name == "Deep Work" }) else { return nil }
         let total = store.periodTotal(for: a, now: now)

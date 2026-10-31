@@ -19,9 +19,10 @@ struct Activity: Identifiable, Hashable {
     var glyph: Glyph { Glyph.tracker(icon) }
     /// Goal in seconds.
     var goal: TimeInterval { TimeInterval(goalMinutes * 60) }
+    var hasGoal: Bool { goalMinutes > 0 }
 
     /// "Weekly · 25h goal" — default card meta line.
-    var goalLine: String { "\(period.adjective) · \(Fmt.goal(minutes: goalMinutes)) goal" }
+    var goalLine: String { period.goalLine(minutes: goalMinutes) }
 }
 
 struct WorkSession: Identifiable, Hashable {

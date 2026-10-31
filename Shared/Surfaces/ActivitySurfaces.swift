@@ -139,7 +139,7 @@ struct IslandExpandedFooter: View {
             if state.isOver(at: now) {
                 DrainStrip(frame: .settled, overflow: Drained.overflowTicks(progress: state.progress(at: now)),
                            accentHex: state.color.accentHex, height: 5)
-            } else {
+            } else if state.hasGoal {
                 SegmentStrip(count: 20, fraction: state.progress(at: now), accent: state.color.accent,
                              height: 5, unfilled: CH.raised, animated: false)
             }
@@ -147,8 +147,12 @@ struct IslandExpandedFooter: View {
                 Text("SINCE \(Fmt.time(state.start))")
                     .geistMono(9, .medium, tracking: 0.06, lineHeight: 13)
                 Spacer(minLength: 8)
-                if let goal = state.goalMinutes {
+                if let goal = state.goalMinutes, goal > 0 {
                     Text("\(Fmt.hm(state.periodTotal(at: now))) / \(Fmt.hm(TimeInterval(goal * 60)))")
+                        .geistMono(9, .medium, tracking: 0.02, lineHeight: 13)
+                        .numericMorph()
+                } else if state.goalMinutes != nil {
+                    Text("\(Fmt.hm(state.periodTotal(at: now))) \(state.goalPeriod.current.uppercased())")
                         .geistMono(9, .medium, tracking: 0.02, lineHeight: 13)
                         .numericMorph()
                 }

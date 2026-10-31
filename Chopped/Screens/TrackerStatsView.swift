@@ -44,8 +44,10 @@ struct TrackerStatsPage: View {
                     .padding(.top, 32)
                 section(top: 36) { LastWeeksChart(activity: a, now: now) }
                 section(top: 44) { DayBars(activity: a, now: now) }
-                section(top: 44) { GoalHitRow(activity: a, now: now) }
-                section(top: 44) { StreakBar(activity: a, width: w, now: now) }
+                if a.hasGoal {
+                    section(top: 44) { GoalHitRow(activity: a, now: now) }
+                    section(top: 44) { StreakBar(activity: a, width: w, now: now) }
+                }
                 section(top: 44) { SessionNumbers(activity: a, now: now) }
                 Button { router.openDetail(a.id) } label: {
                     HStack(spacing: 8) {
@@ -134,6 +136,7 @@ private struct TrackerHero: View {
                     .geistMono(12, .medium, tracking: -0.01, lineHeight: 16).frame(height: 16)
                     .foregroundStyle(CH.textTertiary)
             }
+            if a.hasGoal {
             VStack(spacing: 8) {
                 GrowGroup { grown in
                     Capsule().fill(CH.raised)
@@ -153,6 +156,7 @@ private struct TrackerHero: View {
                 }
             }
             .padding(.top, 12)
+            }
         }
         .frame(maxWidth: .infinity)
     }
@@ -201,15 +205,19 @@ private struct LastWeeksChart: View {
             }
             .frame(height: 119, alignment: .bottom)
             .overlay(alignment: .top) {
+                if goal > 0 {
                 Line().stroke(Color.white.opacity(0x47 / 255), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
                     .frame(height: 1)
                     .offset(y: goalLineY - 1)
+                }
             }
             .overlay(alignment: .topTrailing) {
+                if goal > 0 {
                 Text("GOAL \(Fmt.words(goal).uppercased())")
                     .geistMono(8, .medium, tracking: 0.06, lineHeight: 12).frame(height: 12)
                     .foregroundStyle(CH.textTertiary)
                     .offset(y: goalLineY - 1 - 16)
+                }
             }
         }
     }

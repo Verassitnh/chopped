@@ -23,6 +23,7 @@ extension ChoppedActivityAttributes.ContentState {
     var color: TrackerColor { TrackerColor.forHex(colorHex) }
     var glyph: Glyph { Glyph.tracker(icon) }
     var goalPeriod: GoalPeriod { period.flatMap(GoalPeriod.init(rawValue:)) ?? .week }
+    var hasGoal: Bool { (goalMinutes ?? 0) > 0 }
 
     /// Logged in the current goal period at `now` ("22:49" of "22:49 / 25:00").
     func periodTotal(at now: Date) -> TimeInterval { (periodBase ?? 0) + max(0, now.timeIntervalSince(start)) }

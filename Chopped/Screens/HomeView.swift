@@ -186,11 +186,15 @@ struct TrackerCard: View {
                 DrainStrip(frame: frame, overflow: overflow, accentHex: a.color.accentHex)
             }
             .scaleEffect(x: 1 + frame.squash * 0.5, y: 1 - frame.squash, anchor: .bottom)
-        } else {
+        } else if a.hasGoal {
             TrackerBezel(color: a.color) {
                 content(a, over: nil, drained: false)
             } footer: {
                 SegmentStrip(fraction: store.progress(for: a, now: now), accent: a.color.accent)
+            }
+        } else {
+            TrackerBezel(color: a.color) {
+                content(a, over: nil, drained: false)
             }
         }
     }
@@ -249,7 +253,8 @@ struct TrackerCard: View {
                     if let over {
                         Text(clockedIn) + overText(over, palette)
                     } else {
-                        Text(clockedIn + "\(Fmt.hm(total)) of \(Fmt.goal(minutes: a.goalMinutes))")
+                        Text(clockedIn + (a.hasGoal ? "\(Fmt.hm(total)) of \(Fmt.goal(minutes: a.goalMinutes))"
+                                                      : "\(Fmt.hm(total)) \(a.period.current)"))
                     }
                 }
                 .geist(13, .medium, lineHeight: 17)
@@ -300,6 +305,7 @@ struct TrackerCard: View {
 
     /// "Weekly · 8h goal", or "Daily · 45m · 6-day streak" once a streak is worth showing.
     private func metaLine(_ a: Activity) -> String {
+        guard a.hasGoal else { return a.goalLine }
         let streak = store.streak(for: a, now: now).current
         guard streak >= Self.streakThreshold(a.period) else { return a.goalLine }
         let unit = a.period == .day ? "day" : a.period.rawValue

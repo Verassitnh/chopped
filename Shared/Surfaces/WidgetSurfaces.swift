@@ -35,7 +35,8 @@ struct MediumWidgetView: View {
                 Text(t.name)
                     .geist(14, .semibold, lineHeight: 18)
                     .foregroundStyle(CH.onAccent)
-                Text("\(Fmt.hm(t.periodTotal(at: now))) of \(Fmt.goal(minutes: t.goalMinutes))")
+                Text(t.hasGoal ? "\(Fmt.hm(t.periodTotal(at: now))) of \(Fmt.goal(minutes: t.goalMinutes))"
+                               : "\(Fmt.hm(t.periodTotal(at: now))) \(t.period.current)")
                     .geist(11, .medium, lineHeight: 14)
                     .foregroundStyle(Color.black.opacity(0.6))
                     .numericMorph()
@@ -132,9 +133,11 @@ struct SmallWidgetView: View {
                                 .geistMono(30, .medium, tracking: -0.05, lineHeight: 34)
                                 .foregroundStyle(CH.onAccent)
                                 .numericMorph()
-                            Text("/\(Fmt.hm(t.goal))")
-                                .geistMono(12, .medium, tracking: -0.02, lineHeight: 16)
-                                .foregroundStyle(Color.black.opacity(0.55))
+                            if t.hasGoal {
+                                Text("/\(Fmt.hm(t.goal))")
+                                    .geistMono(12, .medium, tracking: -0.02, lineHeight: 16)
+                                    .foregroundStyle(Color.black.opacity(0.55))
+                            }
                         }
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
@@ -145,10 +148,12 @@ struct SmallWidgetView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             .background(accent, in: RoundedRectangle(cornerRadius: 21, style: .continuous))
 
-            SegmentStrip(count: 12, fraction: t.progress(at: now), accent: accent, height: 5, animated: false)
-                .padding(EdgeInsets(top: 0, leading: 14, bottom: 0, trailing: 12))
+            if t.hasGoal {
+                SegmentStrip(count: 12, fraction: t.progress(at: now), accent: accent, height: 5, animated: false)
+                    .padding(EdgeInsets(top: 0, leading: 14, bottom: 0, trailing: 12))
+            }
         }
-        .padding(EdgeInsets(top: 5, leading: 5, bottom: 12, trailing: 5))
+        .padding(EdgeInsets(top: 5, leading: 5, bottom: t.hasGoal ? 12 : 5, trailing: 5))
     }
 }
 
