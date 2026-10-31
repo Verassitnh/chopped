@@ -13,7 +13,7 @@ struct HomeView: View {
         // A plain List (styled to look like the stacked cards) so each card gets the native
         // swipe-left-to-delete gesture alongside normal vertical scrolling.
         List {
-            Ticker { now in header(now: now) }
+            Ticker(every: 60) { now in header(now: now) }
                 .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
@@ -21,7 +21,7 @@ struct HomeView: View {
                 // The card is a Button (press feedback: 0.98 spring, off with Reduce Motion); its
                 // Play/Stop are separate Buttons inside the label, so they take their own taps.
                 Button { router.openDetail(a.id) } label: {
-                    Ticker { now in
+                    Ticker(every: store.isRunning(a.id) ? 1 : 60) { now in
                         TrackerCard(activity: a, now: now,
                                     start: { toggle { store.clockIn(a) } },
                                     stop: { toggle { store.stop() } })
