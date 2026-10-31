@@ -76,9 +76,9 @@ struct PlayButton: View {
                 .fill(background)
                 .frame(width: size, height: size)
                 .overlay {
-                    // Triangle box is round(s*.32) wide, nudged right by 2pt @40 so it looks centred.
+                    // Triangle box is round(s*.32) wide, nudged right 1.2pt @40 so its centroid sits on the circle's centre.
                     GlyphView(.play, size: (size * 0.32).rounded(), color: foreground)
-                        .offset(x: size * 0.05)
+                        .offset(x: size * 0.03)
                 }
                 .contentShape(Circle())
                 .accessibilityLabel("Start")
