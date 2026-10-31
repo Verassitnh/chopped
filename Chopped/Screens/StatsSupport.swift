@@ -137,10 +137,8 @@ enum StatsFmt {
     /// Deltas with a true minus sign, as in the designs ("+3:19", "−0:46").
     static func delta(_ t: TimeInterval) -> String { (t < 0 ? "\u{2212}" : "+") + Fmt.hm(abs(t)) }
 
-    /// Week labels use the preceding Sunday, as in the designs ("OCT 11" for the week of Mon Oct 12).
     static func weekLabel(_ weekStart: Date) -> String {
-        let sunday = Calendar.chopped.date(byAdding: .day, value: -1, to: weekStart) ?? weekStart
-        return sunday.formatted(.dateTime.month(.abbreviated).day()).uppercased()
+        weekStart.formatted(.dateTime.month(.abbreviated).day()).uppercased()
     }
 
     static func month(_ d: Date) -> String { d.formatted(.dateTime.month(.abbreviated)).uppercased() }

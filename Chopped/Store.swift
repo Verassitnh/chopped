@@ -130,7 +130,6 @@ final class Store {
     private(set) var clockEvent: ClockEvent?
     private var loaded = false
 
-    /// Monday-first calendar used for every bucket.
     var calendar: Calendar { .chopped }
 
     init(db: Database = Database(), seed: Bool = true, liveActivities: Bool = true) {
@@ -256,7 +255,7 @@ final class Store {
         return zip(days, buckets).map { PeriodTotal(interval: $0, seconds: $1) }
     }
 
-    /// This week's 7 days Mon→Sun (detail + tracker-stats day bars). Future days have 0.
+    /// This week's 7 days Sun→Sat (detail + tracker-stats day bars). Future days have 0.
     func thisWeekDays(for activityID: Int64? = nil, now: Date) -> [PeriodTotal] {
         dailyTotals(for: activityID, in: Store.week(containing: now), now: now)
     }

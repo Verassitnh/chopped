@@ -119,7 +119,7 @@ struct TrackerDetailView: View {
         let days = store.thisWeekDays(for: a.id, now: now)
         let maxSeconds = max(days.map(\.seconds).max() ?? 0, 1)
         let today = Store.day(containing: now)
-        let letters = ["M", "T", "W", "T", "F", "S", "S"]
+        let letters = ["S", "M", "T", "W", "T", "F", "S"]
         return HStack(alignment: .bottom, spacing: 8) {
             ForEach(Array(days.enumerated()), id: \.element.id) { i, d in
                 let isToday = d.interval.start == today.start
@@ -342,11 +342,10 @@ private struct DetailHeader: View {
         return left > 0 ? "\(Fmt.words(left)) left" : "Goal hit"
     }
 
-    /// "Mon" for weeks, "daily"/"1st"/"Jan 1" for the others.
     static func resetLabel(_ period: GoalPeriod) -> String {
         switch period {
         case .day: "midnight"
-        case .week: "Mon"
+        case .week: "Sun"
         case .month: "1st"
         case .year: "Jan 1"
         }

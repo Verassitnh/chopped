@@ -54,11 +54,10 @@ enum Fmt {
 }
 
 extension Calendar {
-    /// The app's calendar: user's calendar/time zone, weeks start Monday ("resets Mon").
     static var chopped: Calendar {
         var c = Calendar.current
-        c.firstWeekday = 2
-        c.minimumDaysInFirstWeek = 4
+        c.firstWeekday = 1
+        c.minimumDaysInFirstWeek = 1
         return c
     }
 }

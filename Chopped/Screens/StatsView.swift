@@ -664,8 +664,8 @@ private struct StreakLanes: View {
     }
 
     var body: some View {
-        // Every lane shares one axis: the 12 calendar weeks ending with this one (Mon → Sun, 84 day slots).
-        // Daily lanes run from that Monday through today; weekly lanes have one slot per week.
+        // Every lane shares one axis: the 12 calendar weeks ending with this one (Sun → Sat, 84 day slots).
+        // Daily lanes run from that Sunday through today; weekly lanes have one slot per week.
         let start = store.intervals(.week, count: 12, endingAt: now)[0].start
         let elapsedDays = (Calendar.chopped.dateComponents([.day], from: start, to: Store.day(containing: now).start).day ?? 0) + 1
         let lanes = store.statsTrackers(in: DateInterval(start: start, end: Store.week(containing: now).end), now: now)

@@ -1,14 +1,13 @@
 import Foundation
 
 /// Deterministic demo data for `-QCDemo` (in-memory DB). Frozen now = Fri 23 Oct 2026 20:56:01 (local time).
-/// Weeks start Monday (this week = Oct 19–25). Deep Work running since 20:06:00 → 00:50:01.
+/// Weeks start Sunday (this week = Oct 18–24). Deep Work running since 20:06:00 → 00:50:01.
 /// The per-day table was solved against the (consistency-edited) designs by design/gen/demo/gen.py; see
 /// design/FOUNDATION.md "Demo data". Every number on 01–04 is computed from it and matches Paper exactly.
 enum DemoData {
     static let now: Date = date(2026, 10, 23, 20, 56, 1)
 
-    /// Monday of the current demo week (Oct 19 2026).
-    static let weekStart: Date = date(2026, 10, 19, 0, 0, 0)
+    static let weekStart: Date = date(2026, 10, 18, 0, 0, 0)
 
     static func date(_ y: Int, _ m: Int, _ d: Int, _ h: Int, _ min: Int, _ s: Int = 0) -> Date {
         Calendar.chopped.date(from: DateComponents(year: y, month: m, day: d, hour: h, minute: min, second: s))!
