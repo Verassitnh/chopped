@@ -403,6 +403,7 @@ private struct NewTrackerOverlay: ViewModifier {
                     }
                 }
                 .animation(animation, value: isPresented)
+                .ignoresSafeArea(.keyboard)
             }
     }
 }
