@@ -70,7 +70,7 @@ struct SwitchSheet: View {
     }
 
     private var choices: [Activity] {
-        store.activities.filter { !store.isRunning($0.id) }
+        store.trackers.filter { !store.isRunning($0.id) }
     }
 
     private func subtitle(now: Date) -> String {

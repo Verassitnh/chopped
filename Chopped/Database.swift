@@ -75,6 +75,16 @@ final class Database {
             execute("COMMIT")
             version = 1
         }
+        if version < 2 {
+            execute("BEGIN")
+            let columns = Set(query("PRAGMA table_info(activities)") { $0.text(1) })
+            if !columns.contains("completed_at") {
+                execute("ALTER TABLE activities ADD COLUMN completed_at REAL")
+            }
+            execute("PRAGMA user_version = 2")
+            execute("COMMIT")
+            version = 2
+        }
     }
 
     static let legacyColorMap: [(String, String)] = [

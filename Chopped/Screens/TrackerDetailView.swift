@@ -3,7 +3,7 @@ import SwiftUI
 /// 02 Tracker detail sheet (Paper AGW-0). Presented by RootView via `router.detailActivityID`.
 /// Full-accent header (grabber, icon/name, close X, Pixel timer, progress strip, big Stop/Start pill),
 /// then this week's day bars, the entries list (tap to fix times, + Add to log time), then EDIT TRACKER
-/// (opens the 05 sheet in edit mode) over DELETE TRACKER.
+/// (opens the 05 sheet in edit mode) over COMPLETE TRACKER over DELETE TRACKER.
 struct TrackerDetailView: View {
     @Environment(Store.self) private var store
     @Environment(AppRouter.self) private var router
@@ -15,6 +15,7 @@ struct TrackerDetailView: View {
     @State private var addingEntry = false
     @State private var editingTracker = false
     @State private var confirmingDelete = false
+    @State private var confirmingComplete = false
 
     var body: some View {
         Group {
@@ -29,7 +30,13 @@ struct TrackerDetailView: View {
                         Button("Delete", role: .destructive) { delete(a) }
                         Button("Cancel", role: .cancel) {}
                     } message: {
-                        Text("All of its time entries will be deleted too.")
+                        Text("This will delete all historic data entries.")
+                    }
+                    .alert("Complete \(a.name)?", isPresented: $confirmingComplete) {
+                        Button("Complete") { complete(a) }
+                        Button("Cancel", role: .cancel) {}
+                    } message: {
+                        Text("It leaves your home screen. Its data stays in stats.")
                     }
             } else {
                 CH.bg.onAppear { dismiss() }
@@ -56,6 +63,9 @@ struct TrackerDetailView: View {
                 // (each label carries 8pt of tap padding above and below).
                 VStack(spacing: 4) {
                     textButton("EDIT TRACKER", color: Color(hex: "#F2F2F7")) { editingTracker = true }
+                    if !a.isCompleted {
+                        textButton("COMPLETE TRACKER", color: CH.up) { confirmingComplete = true }
+                    }
                     textButton("DELETE TRACKER", color: Color(hex: "#FF453A")) { confirmingDelete = true }
                 }
                 .padding(.top, 44)
@@ -71,7 +81,7 @@ struct TrackerDetailView: View {
         .ignoresSafeArea(edges: .bottom)
     }
 
-    /// Geist Mono 13 caps text button (EDIT / DELETE TRACKER).
+    /// Geist Mono 13 caps text button (EDIT / COMPLETE / DELETE TRACKER).
     private func textButton(_ title: String, color: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
@@ -94,6 +104,13 @@ struct TrackerDetailView: View {
         router.detailActivityID = nil
         if store.isRunning(a.id) { store.stop() }
         store.deleteActivity(a)
+    }
+
+    private func complete(_ a: Activity) {
+        dismiss()
+        router.detailActivityID = nil
+        if store.isRunning(a.id) { store.stop() }
+        store.completeActivity(a)
     }
 
     // MARK: Week bars

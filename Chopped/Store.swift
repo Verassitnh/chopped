@@ -12,6 +12,8 @@ struct Activity: Identifiable, Hashable {
     /// Goal per `period`, in minutes (25h/week = 1500).
     var goalMinutes: Int = 600
     var period: GoalPeriod = .week
+    var completedAt: Date?
+    var isCompleted: Bool { completedAt != nil }
 
     var color: TrackerColor { TrackerColor.forHex(colorHex) }
     var glyph: Glyph { Glyph.tracker(icon) }
@@ -142,6 +144,12 @@ final class Store {
     var activeActivity: Activity? { activeSession.flatMap { activity($0.activityID) } }
 
     func activity(_ id: Int64) -> Activity? { activities.first { $0.id == id } }
+
+    var trackers: [Activity] { activities.filter { !$0.isCompleted } }
+
+    func statsTrackers(in interval: DateInterval, now: Date) -> [Activity] {
+        activities.filter { !$0.isCompleted || total(for: $0.id, in: interval, now: now) > 0 }
+    }
 
     func isRunning(_ activityID: Int64) -> Bool { activeSession?.activityID == activityID }
 
@@ -321,7 +329,9 @@ final class Store {
         let range = DateInterval(start: calendar.date(byAdding: .day, value: -(count - 1), to: today.start)!, end: today.end)
         let logged = dailyTotals(in: range, now: now)
         return days(in: range).enumerated().map { i, day in
-            let target = activities.reduce(0.0) { $0 + dailyShare(of: $1, on: day.start) }
+            let target = activities
+                .filter { a in a.completedAt.map { day.start < Store.day(containing: $0).end } ?? true }
+                .reduce(0.0) { $0 + dailyShare(of: $1, on: day.start) }
             return DayScore(day: day, score: target > 0 ? min(1, logged[i].seconds / target) : 0)
         }
     }
@@ -375,8 +385,13 @@ final class Store {
         reload()
     }
 
+    func completeActivity(_ activity: Activity, at date: Date = AppClock.now) {
+        db.execute("UPDATE activities SET completed_at = ? WHERE id = ?", [date, activity.id])
+        reload()
+    }
+
     func moveActivities(from source: IndexSet, to destination: Int) {
-        var reordered = activities
+        var reordered = trackers
         reordered.move(fromOffsets: source, toOffset: destination)
         for (position, activity) in reordered.enumerated() {
             db.execute("UPDATE activities SET position = ? WHERE id = ?", [position, activity.id])
@@ -415,9 +430,10 @@ final class Store {
 
     private func reload(silent: Bool = false) {
         let wasRunning = activeSession?.id
-        activities = db.query("SELECT id, name, color, position, icon, goal_minutes, period FROM activities ORDER BY position, id") {
+        activities = db.query("SELECT id, name, color, position, icon, goal_minutes, period, completed_at FROM activities ORDER BY position, id") {
             Activity(id: $0.int(0), name: $0.text(1), colorHex: $0.text(2), position: Int($0.int(3)),
-                     icon: $0.text(4), goalMinutes: Int($0.int(5)), period: GoalPeriod(rawValue: $0.text(6)) ?? .week)
+                     icon: $0.text(4), goalMinutes: Int($0.int(5)), period: GoalPeriod(rawValue: $0.text(6)) ?? .week,
+                     completedAt: $0.date(7))
         }
         sessions = db.query("SELECT id, activity_id, start, end FROM sessions ORDER BY start DESC") {
             WorkSession(id: $0.int(0), activityID: $0.int(1), start: $0.date(2)!, end: $0.date(3))

@@ -187,6 +187,10 @@ enum ChoppedData {
         guard let url = ChoppedDB.existingURL, let db = Connection(url: url, readOnly: false) else { return false }
         let running = db.query("SELECT activity_id FROM sessions WHERE end IS NULL") { sqlite3_column_int64($0, 0) }
         if running == [trackerID] { return true }
+        let hasCompleted = !db.query("SELECT 1 FROM pragma_table_info('activities') WHERE name = 'completed_at'") { _ in 1 }.isEmpty
+        if hasCompleted, db.query("SELECT 1 FROM activities WHERE id = ? AND completed_at IS NULL", [trackerID]) { _ in 1 }.isEmpty {
+            return false
+        }
         db.exec("BEGIN IMMEDIATE")
         db.exec("UPDATE sessions SET end = ? WHERE end IS NULL", [date.timeIntervalSince1970])
         db.exec("INSERT INTO sessions (activity_id, start) VALUES (?, ?)", [trackerID, date.timeIntervalSince1970])
@@ -254,9 +258,11 @@ enum ChoppedData {
         func snapshot(now: Date) -> ChoppedSnapshot {
             struct Row { let id: Int64; let name, color, icon, period: String; let goal: Int; let position: Int }
             let hasChoppedColumns = !query("SELECT 1 FROM pragma_table_info('activities') WHERE name = 'goal_minutes'") { _ in 1 }.isEmpty
+            let hasCompleted = !query("SELECT 1 FROM pragma_table_info('activities') WHERE name = 'completed_at'") { _ in 1 }.isEmpty
+            let filter = hasCompleted ? "WHERE completed_at IS NULL" : ""
             let sql = hasChoppedColumns
-                ? "SELECT id, name, color, icon, period, goal_minutes, position FROM activities ORDER BY position, id"
-                : "SELECT id, name, color, 'target', 'week', 600, position FROM activities ORDER BY position, id"
+                ? "SELECT id, name, color, icon, period, goal_minutes, position FROM activities \(filter) ORDER BY position, id"
+                : "SELECT id, name, color, 'target', 'week', 600, position FROM activities \(filter) ORDER BY position, id"
             let rows = query(sql) {
                 Row(id: sqlite3_column_int64($0, 0), name: Self.text($0, 1, ""), color: Self.text($0, 2, "#4A8BE5"),
                     icon: Self.text($0, 3, "target"), period: Self.text($0, 4, "week"),

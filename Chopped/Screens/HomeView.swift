@@ -17,7 +17,7 @@ struct HomeView: View {
                 .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
-            ForEach(Array(store.activities.enumerated()), id: \.element.id) { index, a in
+            ForEach(Array(store.trackers.enumerated()), id: \.element.id) { index, a in
                 // The card is a Button (press feedback: 0.98 spring, off with Reduce Motion); its
                 // Play/Stop are separate Buttons inside the label, so they take their own taps.
                 Button { router.openDetail(a.id) } label: {
@@ -36,11 +36,11 @@ struct HomeView: View {
                 }
                 // 14pt between cards (7 + 7), 4pt above the first, 24pt below the last.
                 .listRowInsets(EdgeInsets(top: index == 0 ? 4 : 7, leading: 12,
-                                          bottom: index == store.activities.count - 1 ? 24 : 7, trailing: 12))
+                                          bottom: index == store.trackers.count - 1 ? 24 : 7, trailing: 12))
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
             }
-            if store.activities.isEmpty {
+            if store.trackers.isEmpty {
                 emptyState
                     .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 24, trailing: 12))
                     .listRowBackground(Color.clear)
@@ -58,7 +58,7 @@ struct HomeView: View {
             Button("Delete", role: .destructive) { delete(a) }
             Button("Cancel", role: .cancel) {}
         } message: { _ in
-            Text("All of its time entries will be deleted too.")
+            Text("This will delete all historic data entries.")
         }
     }
 

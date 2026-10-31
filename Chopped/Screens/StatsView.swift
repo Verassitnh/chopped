@@ -115,7 +115,7 @@ struct StatsPage: View {
 
     var body: some View {
         let (cur, last) = range.intervals(store, now: now)
-        let rows = store.activities.map { a in
+        let rows = store.statsTrackers(in: DateInterval(start: last.start, end: max(cur.end, last.end)), now: now).map { a in
             TrackerRow(activity: a,
                        current: store.total(for: a.id, in: cur, now: now),
                        last: store.total(for: a.id, in: last, now: now))
@@ -241,8 +241,8 @@ private struct HoursByTracker: View {
     var body: some View {
         let current = rows.reduce(0) { $0 + $1.current }
         let last = rows.reduce(0) { $0 + $1.last }
-        let onPace = store.activities.filter { store.isOnPace($0, now: now) }.count
-        SectionLabel("Hours by tracker", value: "\(onPace)/\(store.activities.count) on pace").frame(height: 16)
+        let onPace = store.trackers.filter { store.isOnPace($0, now: now) }.count
+        SectionLabel("Hours by tracker", value: "\(onPace)/\(store.trackers.count) on pace").frame(height: 16)
         GrowGroup { grown in
             VStack(alignment: .leading, spacing: 6) {
                 splitBar(rows.map { ($0.activity.color.accent, $0.current) }, scale: max(current, last), height: 10, grown: grown)
@@ -394,7 +394,7 @@ private struct GoalCards: View {
     let now: Date
 
     var body: some View {
-        let list = store.activities
+        let list = store.activities.filter { !$0.isCompleted || store.periodTotal(for: $0, now: now) > 0 }
         SectionLabel(title: "Goals") { SectionValueText("tap for detail", color: StatsColor.dim) }.frame(height: 16)
         VStack(spacing: 12) {
             ForEach(Array(stride(from: 0, to: list.count, by: 2)), id: \.self) { i in
@@ -497,7 +497,7 @@ private struct GoalPercentChart: View {
     var body: some View {
         let weeks = store.intervals(.week, count: 8, endingAt: now)
         let thisWeek = Store.week(containing: now)
-        let lines: [Line] = store.activities
+        let lines: [Line] = store.statsTrackers(in: DateInterval(start: weeks[0].start, end: thisWeek.end), now: now)
             .filter { store.weeklyGoal(for: $0, now: now) > 0 }
             .map { ($0, store.total(for: $0.id, in: thisWeek, now: now)) }
             .sorted { $0.1 > $1.1 }
@@ -668,7 +668,7 @@ private struct StreakLanes: View {
         // Daily lanes run from that Monday through today; weekly lanes have one slot per week.
         let start = store.intervals(.week, count: 12, endingAt: now)[0].start
         let elapsedDays = (Calendar.chopped.dateComponents([.day], from: start, to: Store.day(containing: now).start).day ?? 0) + 1
-        let lanes = store.activities
+        let lanes = store.statsTrackers(in: DateInterval(start: start, end: Store.week(containing: now).end), now: now)
             .map { a in Lane(activity: a, series: store.goalSeries(for: a, count: a.period == .day ? elapsedDays : 12, now: now)) }
             .enumerated()
             .sorted { l, r in

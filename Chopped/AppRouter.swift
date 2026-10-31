@@ -44,7 +44,7 @@ final class AppRouter {
 
     /// Applies a `-QCScreen` route. detail/trackerStats target the running tracker (Deep Work in demo), else the first.
     func open(_ screen: AppScreen, store: Store) {
-        let target = store.activeActivity?.id ?? store.activities.first?.id
+        let target = store.activeActivity?.id ?? store.trackers.first?.id
         switch screen {
         case .home: tab = .track
         case .detail: tab = .track; qcPendingDetailID = target
