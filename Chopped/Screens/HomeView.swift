@@ -123,54 +123,139 @@ struct HomeView: View {
 /// One home card (C3.2). Switches between the idle row and the tall running layout.
 struct TrackerCard: View {
     @Environment(Store.self) private var store
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let activity: Activity
     let now: Date
     var start: () -> Void
     var stop: () -> Void
+    @State private var drainStart: Date?
 
     var body: some View {
         let a = activity
-        let running = store.isRunning(a.id)
-        TrackerBezel(color: a.color) {
-            Group {
-                if running { runningRow(a) } else { idleRow(a) }
+        let over = store.overBy(for: a, now: now)
+        Group {
+            if let over, let drainStart {
+                TimelineView(.animation) { context in
+                    let elapsed = context.date.timeIntervalSince(drainStart)
+                    card(a, over: over, frame: DrainFrame(elapsed: elapsed, reduceMotion: reduceMotion))
+                }
+            } else {
+                card(a, over: over, frame: over == nil ? nil : .settled)
             }
-            .transition(.opacity)
-        } footer: {
-            SegmentStrip(fraction: store.progress(for: a, now: now), accent: a.color.accent)
         }
         .animation(nil, value: now)
         .accessibilityElement(children: .contain)
+        .onChange(of: over != nil) { _, isOver in
+            drainStart = isOver ? Date() : nil
+            if isOver, let over, over < 3 { OverLimitAlerts.shared.playSound() }
+        }
+        .task(id: drainStart) {
+            guard drainStart != nil else { return }
+            let overflow = Drained.overflowTicks(progress: store.progress(for: a, now: now))
+            try? await Task.sleep(for: .seconds(DrainFrame.duration(overflow: overflow, reduceMotion: reduceMotion)))
+            drainStart = nil
+        }
+    }
+
+    @ViewBuilder
+    private func card(_ a: Activity, over: TimeInterval?, frame: DrainFrame?) -> some View {
+        if let over, let frame {
+            let overflow = Drained.overflowTicks(progress: store.progress(for: a, now: now))
+            TrackerBezel(tint: Color.mix(a.color.tintHex, Drained.bezelHex, frame.bezel), accent: .clear) {
+                ZStack {
+                    content(a, over: over, drained: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Drained.inner)
+                    if frame.level < 1 {
+                        content(a, over: over, drained: false)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(a.color.accent)
+                            .mask {
+                                if frame.reduceMotion {
+                                    Rectangle().opacity(1 - frame.level)
+                                } else {
+                                    PourShape(level: frame.level, amplitude: DrainFrame.waveHeight, phase: frame.wavePhase)
+                                }
+                            }
+                            .allowsHitTesting(false)
+                            .accessibilityHidden(true)
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 21, style: .continuous))
+            } footer: {
+                DrainStrip(frame: frame, overflow: overflow, accentHex: a.color.accentHex)
+            }
+            .scaleEffect(x: 1 + frame.squash * 0.5, y: 1 - frame.squash, anchor: .bottom)
+        } else {
+            TrackerBezel(color: a.color) {
+                content(a, over: nil, drained: false)
+            } footer: {
+                SegmentStrip(fraction: store.progress(for: a, now: now), accent: a.color.accent)
+            }
+        }
+    }
+
+    private func content(_ a: Activity, over: TimeInterval?, drained: Bool) -> some View {
+        Group {
+            if store.isRunning(a.id) {
+                runningRow(a, over: over, drained: drained)
+            } else {
+                idleRow(a, over: over, drained: drained)
+            }
+        }
+        .transition(.opacity)
+    }
+
+    private struct Palette {
+        let text: Color, meta: Color, strong: Color, icon: Color, iconTile: Color
+
+        static let accent = Palette(text: CH.onAccent, meta: CH.onAccentSecondary, strong: CH.onAccent,
+                                    icon: CH.onAccent, iconTile: CH.iconTileFill)
+        static let drained = Palette(text: Drained.text, meta: Drained.meta, strong: Drained.metaStrong,
+                                     icon: Drained.icon, iconTile: Drained.iconTile)
+    }
+
+    private func overText(_ over: TimeInterval, _ palette: Palette) -> Text {
+        Text(Drained.overLabel(over)).font(.geist(13, .semibold)).foregroundStyle(palette.strong)
     }
 
     // MARK: Running (Deep Work in the design)
 
-    private func runningRow(_ a: Activity) -> some View {
+    private func runningRow(_ a: Activity, over: TimeInterval?, drained: Bool) -> some View {
+        let palette = drained ? Palette.drained : .accent
         let session = store.activeSession
         let elapsed = session.map { now.timeIntervalSince($0.start) } ?? 0
         let total = store.periodTotal(for: a, now: now)
+        let clockedIn = "Clocked in · \(Fmt.time(session?.start ?? now)) · "
         return HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 10) {
-                    IconTile(glyph: a.glyph, size: 30, radius: 9, glyphSize: 16)
+                    IconTile(glyph: a.glyph, size: 30, radius: 9, glyphSize: 16,
+                             foreground: palette.icon, background: palette.iconTile)
                     Text(a.name)
                         .geist(20, .semibold, tracking: -0.015, lineHeight: 24)
-                        .foregroundStyle(CH.onAccent)
+                        .foregroundStyle(palette.text)
                         .lineLimit(1)
                 }
                 Text(Fmt.hms(elapsed))
                     .geistPixel(62)
-                    .foregroundStyle(CH.onAccent)
+                    .foregroundStyle(palette.text)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
                     .contentTransition(.numericText(countsDown: false))
                     .animation(.snappy(duration: 0.25), value: Int(elapsed))
                     .accessibilityLabel("Running for \(Fmt.words(elapsed))")
-                Text("Clocked in · \(Fmt.time(session?.start ?? now)) · \(Fmt.hm(total)) of \(Fmt.goal(minutes: a.goalMinutes))")
-                    .geist(13, .medium, lineHeight: 17)
-                    .foregroundStyle(CH.onAccentSecondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                Group {
+                    if let over {
+                        Text(clockedIn) + overText(over, palette)
+                    } else {
+                        Text(clockedIn + "\(Fmt.hm(total)) of \(Fmt.goal(minutes: a.goalMinutes))")
+                    }
+                }
+                .geist(13, .medium, lineHeight: 17)
+                .foregroundStyle(palette.meta)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             StopButton(accent: a.color.accent, action: stop)
@@ -180,24 +265,31 @@ struct TrackerCard: View {
 
     // MARK: Idle
 
-    private func idleRow(_ a: Activity) -> some View {
+    private func idleRow(_ a: Activity, over: TimeInterval?, drained: Bool) -> some View {
+        let palette = drained ? Palette.drained : .accent
         let total = store.periodTotal(for: a, now: now)
         return HStack(spacing: 12) {
-            IconTile(glyph: a.glyph)
+            IconTile(glyph: a.glyph, foreground: palette.icon, background: palette.iconTile)
             VStack(alignment: .leading, spacing: 1) {
                 Text(a.name)
                     .geist(18, .semibold, tracking: -0.015, lineHeight: 22)
-                    .foregroundStyle(CH.onAccent)
+                    .foregroundStyle(palette.text)
                     .lineLimit(1)
-                Text(metaLine(a))
-                    .geist(13, .medium, lineHeight: 17)
-                    .foregroundStyle(CH.onAccentSecondary)
-                    .lineLimit(1)
+                Group {
+                    if let over {
+                        Text("\(a.period.adjective) · \(Fmt.goal(minutes: a.goalMinutes)) · ") + overText(over, palette)
+                    } else {
+                        Text(metaLine(a))
+                    }
+                }
+                .geist(13, .medium, lineHeight: 17)
+                .foregroundStyle(palette.meta)
+                .lineLimit(1)
             }
             .frame(maxWidth: .infinity, minHeight: 40, maxHeight: 40, alignment: .leading)   // 22 + 1 + 17
             Text(Fmt.hm(total))
                 .geistMono(26, .medium, tracking: -0.05, lineHeight: 30)
-                .foregroundStyle(CH.onAccent)
+                .foregroundStyle(palette.text)
                 .lineLimit(1)
                 .fixedSize()
                 .contentTransition(.numericText())

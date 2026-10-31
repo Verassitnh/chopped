@@ -32,4 +32,17 @@ extension ChoppedActivityAttributes.ContentState {
         guard let g = goalMinutes, g > 0 else { return 0 }
         return periodTotal(at: now) / TimeInterval(g * 60)
     }
+
+    var overDate: Date? {
+        guard let g = goalMinutes, g > 0 else { return nil }
+        return start.addingTimeInterval(TimeInterval(g * 60) - (periodBase ?? 0))
+    }
+
+    func isOver(at now: Date) -> Bool { overDate.map { now > $0 } ?? false }
+
+    var hourMark: Date { start.addingTimeInterval(3600) }
+
+    func staleDate(after now: Date) -> Date? {
+        [overDate, hourMark].compactMap { $0 }.filter { $0 > now }.min()
+    }
 }

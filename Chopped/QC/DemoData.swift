@@ -21,6 +21,23 @@ enum DemoData {
         return store
     }
 
+    static func putOverGoal(_ store: Store) {
+        for (name, minutes) in [("Deep Work", 20 * 60), ("Exercise", 25)] {
+            guard var a = store.activities.first(where: { $0.name == name }) else { continue }
+            a.goalMinutes = minutes
+            store.updateActivity(a)
+        }
+    }
+
+    static func crossSoon(_ store: Store) -> Date? {
+        guard var a = store.activities.first(where: { $0.name == "Deep Work" }) else { return nil }
+        let total = store.periodTotal(for: a, now: now)
+        a.goalMinutes = Int((total / 60).rounded(.up))
+        if TimeInterval(a.goalMinutes * 60) - total < 1 { a.goalMinutes += 1 }
+        store.updateActivity(a)
+        return now.addingTimeInterval(TimeInterval(a.goalMinutes * 60) - total)
+    }
+
     /// One-line-per-metric dump of the computed demo numbers (logged at launch in -QCDemo).
     static func summary(_ store: Store) -> String {
         let n = now

@@ -36,9 +36,22 @@ enum QC {
         }
     }
 
+    static let over = args.contains("-QCOver")
+
+    static let crossIn: TimeInterval? = {
+        guard let i = args.firstIndex(of: "-QCCrossIn"), i + 1 < args.count else { return nil }
+        return TimeInterval(args[i + 1])
+    }()
+
     static func makeStore() -> Store {
         guard demo else { return Store() }
-        return DemoData.makeStore()
+        let store = DemoData.makeStore()
+        if over { DemoData.putOverGoal(store) }
+        if let crossIn, let crossing = DemoData.crossSoon(store) {
+            AppClock.frozen = nil
+            AppClock.offset = crossing.addingTimeInterval(-crossIn).timeIntervalSince(Date())
+        }
+        return store
     }
 
     /// True once the key window's root controller has a presented (sheet) controller that finished animating.

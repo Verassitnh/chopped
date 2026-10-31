@@ -22,7 +22,7 @@ struct ClockInLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: ChoppedActivityAttributes.self) { context in
             LockActivityView(state: context.state, isStale: context.isStale)
-                .activityBackgroundTint(context.state.color.tint)
+                .activityBackgroundTint(context.state.isOver(at: Date()) ? Drained.bezel : context.state.color.tint)
                 .activitySystemActionForegroundColor(.white)
         } dynamicIsland: { context in
             let state = context.state

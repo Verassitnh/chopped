@@ -15,20 +15,42 @@ struct LockActivityView: View {
 
     var body: some View {
         let color = state.color
-        TrackerBezel(color: color) {
-            HStack(spacing: 12) {
-                LiveTimerText(start: state.start, style: .hms, now: now, pastHour: isStale)
-                    .geistPixel(68)
-                    .foregroundStyle(CH.onAccent)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                SwitchLink {
-                    SurfaceSwapGlyph(size: 52, foreground: color.accent)
+        let over = state.isOver(at: now)
+        TrackerBezel(tint: over ? Drained.bezel : color.tint, accent: .clear,
+                     padding: EdgeInsets(5), spacing: 0) {
+            ZStack {
+                if over {
+                    row(drained: true, over: over)
+                        .background(Drained.inner)
+                        .transition(.identity)
+                } else {
+                    row(drained: false, over: over)
+                        .background(color.accent)
+                        .transition(.move(edge: .bottom))
                 }
             }
-            .padding(EdgeInsets(top: 18, leading: 22, bottom: 18, trailing: 14))
+            .clipShape(RoundedRectangle(cornerRadius: 21, style: .continuous))
+            .animation(.spring(duration: 1.6, bounce: 0.35), value: over)
+        } footer: {
+            EmptyView()
         }
+    }
+
+    private func row(drained: Bool, over: Bool) -> some View {
+        HStack(spacing: 12) {
+            LiveTimerText(start: state.start, style: over ? .selfUpdating : .hms, now: now,
+                          pastHour: isStale && !over)
+                .geistPixel(68)
+                .foregroundStyle(drained ? Drained.text : CH.onAccent)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            SwitchLink {
+                SurfaceSwapGlyph(size: 52, foreground: state.color.accent)
+            }
+        }
+        .padding(EdgeInsets(top: 18, leading: 22, bottom: 18, trailing: 14))
+        .frame(maxWidth: .infinity)
     }
 }
 
@@ -54,13 +76,14 @@ struct IslandCompactTimer: View {
     /// Live timer text reserves a fixed width, so size it to "50:01" (5 cells) or "1:50:01" (7 cells):
     /// Geist Mono advance 0.6em − 0.02em tracking at 15pt = 8.7pt per cell.
     var width: CGFloat {
-        (isStale || now.timeIntervalSince(state.start) >= 3600) ? 68 : 50
+        (isStale || state.isOver(at: now) || now.timeIntervalSince(state.start) >= 3600) ? 68 : 50
     }
 
     var body: some View {
-        LiveTimerText(start: state.start, style: .compact, now: now, pastHour: isStale)
+        let over = state.isOver(at: now)
+        LiveTimerText(start: state.start, style: over ? .selfUpdating : .compact, now: now, pastHour: isStale && !over)
             .geistMono(15, .semibold, tracking: -0.02, lineHeight: 19)
-            .foregroundStyle(state.color.accent)
+            .foregroundStyle(over ? Drained.text : state.color.accent)
             .multilineTextAlignment(.trailing)
             .lineLimit(1)
             .frame(width: AppClock.isFrozen ? nil : width, alignment: .trailing)
@@ -83,7 +106,8 @@ struct IslandExpandedHeader: View {
                     .geist(14, .semibold, lineHeight: 18)
                     .foregroundStyle(CH.textMuted)
                     .lineLimit(1)
-                LiveTimerText(start: state.start, style: .hms, now: now, pastHour: isStale)
+                let over = state.isOver(at: now)
+                LiveTimerText(start: state.start, style: over ? .selfUpdating : .hms, now: now, pastHour: isStale && !over)
                     .geistPixel(44)
                     .foregroundStyle(.white)
                     .lineLimit(1)
@@ -112,8 +136,13 @@ struct IslandExpandedFooter: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            SegmentStrip(count: 20, fraction: state.progress(at: now), accent: state.color.accent,
-                         height: 5, unfilled: CH.raised, animated: false)
+            if state.isOver(at: now) {
+                DrainStrip(frame: .settled, overflow: Drained.overflowTicks(progress: state.progress(at: now)),
+                           accentHex: state.color.accentHex, height: 5)
+            } else {
+                SegmentStrip(count: 20, fraction: state.progress(at: now), accent: state.color.accent,
+                             height: 5, unfilled: CH.raised, animated: false)
+            }
             HStack {
                 Text("SINCE \(Fmt.time(state.start))")
                     .geistMono(9, .medium, tracking: 0.06, lineHeight: 13)

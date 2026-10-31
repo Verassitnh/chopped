@@ -225,6 +225,12 @@ final class Store {
         activity.goal > 0 ? periodTotal(for: activity, now: now) / activity.goal : 0
     }
 
+    func overBy(for activity: Activity, now: Date) -> TimeInterval? {
+        guard activity.goal > 0 else { return nil }
+        let over = periodTotal(for: activity, now: now) - activity.goal
+        return over > 0 ? over : nil
+    }
+
     /// Goal minus logged time in the current period (0 when hit). "2h 11m left".
     func remaining(for activity: Activity, now: Date) -> TimeInterval {
         max(0, activity.goal - periodTotal(for: activity, now: now))

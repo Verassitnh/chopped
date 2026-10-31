@@ -57,6 +57,7 @@ enum LiveActivityBridge {
             AppGroup.defaults?.set(enabled, forKey: AppGroup.liveActivitiesEnabledKey)
         }
         let running = ClockIn.activities.filter { $0.activityState == .active || $0.activityState == .stale }
+        OverLimitNotice.schedule(for: state)
 
         guard let state else {
             for live in running {
@@ -65,9 +66,9 @@ enum LiveActivityBridge {
             return
         }
 
-        // Stale at the 1h mark so the island re-renders with room for the hour field ("1:00:00").
-        let hourMark = state.start.addingTimeInterval(3600)
-        let content = ActivityContent(state: state, staleDate: hourMark > Date() ? hourMark : nil)
+        // Stale at the 1h mark so the island re-renders with room for the hour field ("1:00:00"), or earlier
+        // when the tracker runs past its goal, so the system re-renders it drained without the app running.
+        let content = ActivityContent(state: state, staleDate: state.staleDate(after: Date()))
         if let current = running.first {
             for extra in running.dropFirst() {
                 Task { await extra.end(nil, dismissalPolicy: .immediate) }

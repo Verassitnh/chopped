@@ -18,6 +18,7 @@ struct LiveTimerText: View {
         case hms
         /// "50:01" / "1:50:01" — island compact, widgets.
         case compact
+        case selfUpdating
     }
 
     let start: Date
@@ -49,6 +50,8 @@ struct LiveTimerText: View {
                 // "1:00:46"
                 Text(.currentDate, format: .timer(countingUpIn: start..<Date.distantFuture,
                                                   showsHours: true, maxFieldCount: 3))
+            case (.selfUpdating, _):
+                Text(timerInterval: start...Date.distantFuture, countsDown: false)
             }
         } else {
             Text(timerInterval: start...Date.distantFuture, countsDown: false)

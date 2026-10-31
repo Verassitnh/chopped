@@ -15,6 +15,7 @@ struct ChoppedApp: App {
         // Activity straight from SQLite; the in-memory store is only re-read while the app is on screen
         // (a background launch for an intent stays light; the foreground refresh below catches up).
         if !QC.demo {
+            OverLimitAlerts.shared.install()
             ChoppedSync.appRefresh = {
                 if UIApplication.shared.applicationState == .active { store.refresh() }
             }

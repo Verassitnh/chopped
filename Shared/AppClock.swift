@@ -6,7 +6,9 @@ enum AppClock {
     /// Set once at launch by the QC harness. nil = real time.
     nonisolated(unsafe) static var frozen: Date?
 
-    static var now: Date { frozen ?? Date() }
+    nonisolated(unsafe) static var offset: TimeInterval = 0
+
+    static var now: Date { frozen ?? Date().addingTimeInterval(offset) }
     static var isFrozen: Bool { frozen != nil }
 }
 
