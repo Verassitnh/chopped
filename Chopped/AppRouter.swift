@@ -12,13 +12,30 @@ final class AppRouter {
     var detailActivityID: Int64?
     /// New tracker sheet (05).
     var showingNewTracker = false
+    var showingSwitcher = false
     /// Stats navigation stack; push a tracker id to show Tracker Stats (04).
     var statsPath: [Int64] = []
     /// `-QCScreen detail`: presented by RootView once its window is on screen. Setting `detailActivityID`
     /// before the window exists can drop the sheet on device (the presenter isn't in the hierarchy yet).
     var qcPendingDetailID: Int64?
+    var qcPendingSwitcher = false
 
     func openDetail(_ id: Int64) { detailActivityID = id }
+
+    func open(_ url: URL) {
+        guard url == ChoppedLink.switcher else { return }
+        tab = .track
+        showingNewTracker = false
+        guard detailActivityID != nil else {
+            showingSwitcher = true
+            return
+        }
+        detailActivityID = nil
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(0.45))
+            showingSwitcher = true
+        }
+    }
     func openTrackerStats(_ id: Int64) {
         detailActivityID = nil
         tab = .stats
@@ -34,6 +51,7 @@ final class AppRouter {
         case .stats: tab = .stats
         case .trackerStats: tab = .stats; statsPath = target.map { [$0] } ?? []
         case .newTracker: tab = .track; showingNewTracker = true
+        case .switcher: tab = .track; qcPendingSwitcher = true
         }
     }
 }

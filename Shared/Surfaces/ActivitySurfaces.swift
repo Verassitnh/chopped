@@ -4,7 +4,8 @@ typealias ClockInState = ChoppedActivityAttributes.ContentState
 
 // MARK: - 06 Lock screen Live Activity (Paper B7A-0)
 
-/// Tinted bezel (uniform 5pt, r26) around the bright accent block: Pixel 68 timer + 52pt stop.
+/// Tinted bezel (uniform 5pt, r26) around the bright accent block: Pixel 68 timer + 52pt swap button
+/// that opens the app's Switch sheet.
 /// No name, no strip. The bezel tint is also set as `activityBackgroundTint` by the widget.
 struct LockActivityView: View {
     let state: ClockInState
@@ -22,8 +23,8 @@ struct LockActivityView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                IntentButton(intent: WidgetStopTrackerIntent(), accessibility: "Stop \(state.name)") {
-                    SurfaceStopGlyph(size: 52, accent: color.accent)
+                SwitchLink {
+                    SurfaceSwapGlyph(size: 52, foreground: color.accent)
                 }
             }
             .padding(EdgeInsets(top: 18, leading: 22, bottom: 18, trailing: 14))
@@ -93,13 +94,13 @@ struct IslandExpandedHeader: View {
     }
 }
 
-/// Expanded stop: 52pt accent circle with a 16pt black square.
-struct IslandStopButton: View {
+/// Expanded swap: 52pt accent circle with a black ⇄; opens the app's Switch sheet.
+struct IslandSwapButton: View {
     let state: ClockInState
 
     var body: some View {
-        IntentButton(intent: WidgetStopTrackerIntent(), accessibility: "Stop \(state.name)") {
-            SurfaceStopGlyph(size: 52, accent: .black, background: state.color.accent)
+        SwitchLink {
+            SurfaceSwapGlyph(size: 52, foreground: .black, background: state.color.accent)
         }
     }
 }
@@ -139,7 +140,7 @@ struct IslandExpandedView: View {
         VStack(spacing: 14) {
             HStack(spacing: 12) {
                 IslandExpandedHeader(state: state, now: now)
-                IslandStopButton(state: state)
+                IslandSwapButton(state: state)
             }
             IslandExpandedFooter(state: state, now: now)
         }

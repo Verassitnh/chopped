@@ -31,8 +31,21 @@ struct RootView: View {
         .sheet(item: $router.detailActivityID) { id in
             TrackerDetailView(activityID: id)
         }
+        .sheet(isPresented: $router.showingSwitcher) {
+            SwitchSheet()
+        }
         .newTrackerOverlay(isPresented: $router.showingNewTracker)
+        .onOpenURL { router.open($0) }
         .task {
+            if router.qcPendingSwitcher {
+                router.qcPendingSwitcher = false
+                for _ in 0..<40 where UIApplication.shared.applicationState != .active {
+                    try? await Task.sleep(for: .seconds(0.1))
+                }
+                try? await Task.sleep(for: .seconds(0.3))
+                router.showingSwitcher = true
+                return
+            }
             // -QCScreen detail: present once the scene is active and on screen (device launches are slower).
             guard let id = router.qcPendingDetailID else { return }
             router.qcPendingDetailID = nil

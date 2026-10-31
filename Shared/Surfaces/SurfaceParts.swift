@@ -75,6 +75,32 @@ struct SurfaceStopGlyph: View {
     }
 }
 
+struct SurfaceSwapGlyph: View {
+    var size: CGFloat
+    var foreground: Color
+    var background: Color = .black
+
+    var body: some View {
+        Circle().fill(background)
+            .frame(width: size, height: size)
+            .overlay { GlyphView(.swap, size: (size * 0.42).rounded(), color: foreground) }
+            .contentShape(Circle())
+    }
+}
+
+struct SwitchLink<Label: View>: View {
+    @ViewBuilder var label: Label
+
+    var body: some View {
+        Link(destination: ChoppedLink.switcher) { label }
+            .accessibilityLabel("Switch tracker")
+    }
+}
+
+enum ChoppedLink {
+    static let switcher = URL(string: "chopped://switch")!
+}
+
 /// Wraps content in an intent button (plain style) — works in widgets, live activities and the app.
 struct IntentButton<I: AppIntent, Label: View>: View {
     let intent: I

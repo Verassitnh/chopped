@@ -3,11 +3,11 @@ import UIKit
 
 /// Screens addressable by `-QCScreen <name>` (and the app's top-level routes).
 enum AppScreen: String, CaseIterable {
-    case home, detail, stats, trackerStats, newTracker
+    case home, detail, stats, trackerStats, newTracker, switcher
 }
 
 /// QC harness. Launch arguments:
-///   -QCScreen <home|detail|stats|trackerStats|newTracker>   open that screen directly
+///   -QCScreen <home|detail|stats|trackerStats|newTracker|switcher>   open that screen directly
 ///   -QCDemo                                                  in-memory demo data + frozen now (Fri 23 Oct 2026 20:56:01)
 ///   -QCSnapshot                                              ~1.5s after layout, write Documents/qc-<screen>.png
 ///   -QCFullPage                                              (stats/trackerStats) also write qc-<screen>-full.png, full scroll height

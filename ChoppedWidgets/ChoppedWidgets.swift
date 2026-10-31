@@ -33,7 +33,7 @@ struct ClockInLiveActivity: Widget {
                         .dynamicIsland(verticalPlacement: .belowIfTooWide)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    IslandStopButton(state: state)
+                    IslandSwapButton(state: state)
                         .padding(.trailing, 6)
                         .frame(maxHeight: .infinity)
                 }
