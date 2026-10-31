@@ -378,6 +378,14 @@ private struct NewTrackerOverlay: ViewModifier {
     var editing: Activity?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    private var animation: Animation {
+        reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.4, dampingFraction: 0.9)
+    }
+
+    private func dismiss() {
+        withAnimation(animation) { isPresented = false }
+    }
+
     func body(content: Content) -> some View {
         content
             .overlay {
@@ -385,17 +393,16 @@ private struct NewTrackerOverlay: ViewModifier {
                     if isPresented {
                         CH.bg.opacity(0.65)
                             .ignoresSafeArea()
-                            .onTapGesture { isPresented = false }
+                            .onTapGesture { dismiss() }
                             .accessibilityHidden(true)
                             .transition(.opacity)
-                        NewTrackerView(editing: editing, onClose: { isPresented = false })
+                        NewTrackerView(editing: editing, onClose: dismiss)
                             .accessibilityAddTraits(.isModal)
                             .transition(reduceMotion ? .opacity : .move(edge: .bottom))
                             .zIndex(1)
                     }
                 }
-                .animation(reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.4, dampingFraction: 0.9),
-                           value: isPresented)
+                .animation(animation, value: isPresented)
             }
     }
 }
