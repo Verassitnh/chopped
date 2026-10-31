@@ -22,15 +22,15 @@ struct LockActivityView: View {
                 if over {
                     row(drained: true, over: over)
                         .background(Drained.inner)
-                        .transition(.identity)
+                        .transition(.opacity)
                 } else {
                     row(drained: false, over: over)
                         .background(color.accent)
-                        .transition(.move(edge: .bottom))
+                        .transition(.opacity)
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 21, style: .continuous))
-            .animation(.spring(duration: 1.6, bounce: 0.35), value: over)
+            .animation(.easeInOut(duration: 0.8), value: over)
         } footer: {
             EmptyView()
         }
