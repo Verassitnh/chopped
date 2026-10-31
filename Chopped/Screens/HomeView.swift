@@ -10,47 +10,47 @@ struct HomeView: View {
     @State private var pendingDelete: Activity?
 
     var body: some View {
-        Ticker { now in
-            // A plain List (styled to look like the stacked cards) so each card gets the native
-            // swipe-left-to-delete gesture alongside normal vertical scrolling.
-            List {
-                header(now: now)
-                    .listRowInsets(EdgeInsets())
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-                ForEach(Array(store.activities.enumerated()), id: \.element.id) { index, a in
-                    // The card is a Button (press feedback: 0.98 spring, off with Reduce Motion); its
-                    // Play/Stop are separate Buttons inside the label, so they take their own taps.
-                    Button { router.openDetail(a.id) } label: {
+        // A plain List (styled to look like the stacked cards) so each card gets the native
+        // swipe-left-to-delete gesture alongside normal vertical scrolling.
+        List {
+            Ticker { now in header(now: now) }
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+            ForEach(Array(store.activities.enumerated()), id: \.element.id) { index, a in
+                // The card is a Button (press feedback: 0.98 spring, off with Reduce Motion); its
+                // Play/Stop are separate Buttons inside the label, so they take their own taps.
+                Button { router.openDetail(a.id) } label: {
+                    Ticker { now in
                         TrackerCard(activity: a, now: now,
                                     start: { toggle { store.clockIn(a) } },
                                     stop: { toggle { store.stop() } })
-                            .contentShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
                     }
-                    .buttonStyle(PressScaleStyle(scale: 0.98))
-                    .accessibilityHint("Opens tracker details")
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        Button { pendingDelete = a } label: { Label("Delete", systemImage: "trash.fill") }
-                            .tint(Color(hex: "#FF453A"))
-                    }
-                    // 14pt between cards (7 + 7), 4pt above the first, 24pt below the last.
-                    .listRowInsets(EdgeInsets(top: index == 0 ? 4 : 7, leading: 12,
-                                              bottom: index == store.activities.count - 1 ? 24 : 7, trailing: 12))
+                    .contentShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+                }
+                .buttonStyle(PressScaleStyle(scale: 0.98))
+                .accessibilityHint("Opens tracker details")
+                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    Button { pendingDelete = a } label: { Label("Delete", systemImage: "trash.fill") }
+                        .tint(Color(hex: "#FF453A"))
+                }
+                // 14pt between cards (7 + 7), 4pt above the first, 24pt below the last.
+                .listRowInsets(EdgeInsets(top: index == 0 ? 4 : 7, leading: 12,
+                                          bottom: index == store.activities.count - 1 ? 24 : 7, trailing: 12))
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+            }
+            if store.activities.isEmpty {
+                emptyState
+                    .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 24, trailing: 12))
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
-                }
-                if store.activities.isEmpty {
-                    emptyState
-                        .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 24, trailing: 12))
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
-                }
             }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
-            .environment(\.defaultMinListRowHeight, 0)
-            .scrollIndicators(.hidden)
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .environment(\.defaultMinListRowHeight, 0)
+        .scrollIndicators(.hidden)
         .background(CH.bg)
         .alert("Delete \(pendingDelete?.name ?? "tracker")?",
                isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
