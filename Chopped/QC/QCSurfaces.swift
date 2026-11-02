@@ -5,7 +5,7 @@ import SwiftUI
 /// `-QCSnapshot` writes `Documents/qc-<name>.png`. Add `-QCRealSize` to render widgets at the system
 /// sizes of the iPhone 18 Pro Max (small 176.67, medium 378×176.67, as logged by chronod) instead of the artboard sizes (182, 388×170).
 enum QCSurface: String {
-    case widgets, liveActivity, island
+    case widgets, liveActivity, island, standby, standbyNight
 
     static let current: QCSurface? = {
         let args = ProcessInfo.processInfo.arguments
@@ -77,6 +77,8 @@ struct QCSurfacesView: View {
         case .widgets: widgets(snapshot, now: now)
         case .liveActivity: lock(snapshot, now: now)
         case .island: island(snapshot, now: now)
+        case .standby: standby(snapshot, now: now, style: .standby)
+        case .standbyNight: standby(snapshot, now: now, style: .night)
         }
     }
 
@@ -123,6 +125,43 @@ struct QCSurfacesView: View {
         v().frame(width: size.width, height: size.height)
             .background(bg)
             .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+    }
+
+    private func standby(_ s: ChoppedSnapshot, now: Date, style: SquareWidgetStyle) -> some View {
+        GeometryReader { geo in
+            standbyScreen(s.running!, now: now, style: style)
+            .frame(width: geo.size.height, height: geo.size.width)
+            .rotationEffect(.degrees(90))
+            .frame(width: geo.size.width, height: geo.size.height)
+        }
+        .background(.black)
+        .ignoresSafeArea()
+    }
+
+    private func standbyScreen(_ t: TrackerSnapshot, now: Date, style: SquareWidgetStyle) -> some View {
+        let red = Color(hex: "#FF3B30")
+        let night = style == .night
+        return HStack(spacing: 28) {
+            SmallWidgetView(tracker: t, now: now, style: style, bezel: false)
+                .frame(width: 170, height: 170)
+                .scaleEffect(2.2)
+                .frame(width: 374, height: 374)
+                .colorMultiply(night ? red : .white)
+            VStack(spacing: 6) {
+                Text(now.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated)))
+                    .font(.system(size: 22, weight: .medium))
+                    .foregroundStyle(night ? red.opacity(0.6) : CH.textSecondary)
+                Text(Fmt.time(now))
+                    .font(.system(size: 124, weight: .bold))
+                    .tracking(-3)
+                    .foregroundStyle(night ? red : Color(hex: "#F2F2F7"))
+                    .lineLimit(1)
+                    .fixedSize()
+            }
+            .frame(width: 374)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(.black)
     }
 
     // 06 — bg #0A0A0C, card 14pt from the sides, 120 from the bottom.

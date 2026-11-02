@@ -161,7 +161,7 @@ struct TrackerWidget: Widget {
     var body: some WidgetConfiguration {
         AppIntentConfiguration(kind: "ChoppedTracker", intent: SelectTrackerIntent.self, provider: TrackerProvider()) { entry in
             if let t = entry.smallTracker {
-                SmallWidgetView(tracker: t, somethingRunning: entry.snapshot?.running != nil, now: entry.date)
+                TrackerWidgetView(tracker: t, somethingRunning: entry.snapshot?.running != nil, now: entry.date)
                     .containerBackground(t.color.tint, for: .widget)
             } else {
                 EmptyWidgetView()
@@ -169,9 +169,24 @@ struct TrackerWidget: Widget {
             }
         }
         .configurationDisplayName("Tracker")
-        .description("Start, stop and follow one tracker.")
+        .description("Start, switch and follow one tracker.")
         .supportedFamilies([.systemSmall])
         .contentMarginsDisabled()
+    }
+}
+
+struct TrackerWidgetView: View {
+    let tracker: TrackerSnapshot
+    let somethingRunning: Bool
+    let now: Date
+
+    @Environment(\.showsWidgetContainerBackground) private var showsBackground
+    @Environment(\.widgetRenderingMode) private var renderingMode
+
+    var body: some View {
+        SmallWidgetView(tracker: tracker, somethingRunning: somethingRunning, now: now,
+                        style: renderingMode != .fullColor ? .night : (showsBackground ? .home : .standby),
+                        bezel: showsBackground)
     }
 }
 

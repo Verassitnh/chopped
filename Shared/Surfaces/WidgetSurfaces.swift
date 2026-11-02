@@ -1,3 +1,4 @@
+import AppIntents
 import SwiftUI
 
 // MARK: - 07 Home-screen widgets (Paper B7U-0)
@@ -51,8 +52,8 @@ struct MediumWidgetView: View {
                     .lineLimit(1)
                     .frame(maxWidth: 130, alignment: .trailing)
                     .fixedSize(horizontal: AppClock.isFrozen, vertical: false)
-                IntentButton(intent: WidgetStopTrackerIntent(), accessibility: "Stop \(t.name)") {
-                    SurfaceStopGlyph(size: 36, accent: t.color.accent)
+                WidgetSwitchButton {
+                    SurfaceSwapGlyph(size: 36, foreground: t.color.accent)
                 }
             } else {
                 Text(Fmt.hm(t.periodTotal(at: now)))
@@ -90,70 +91,97 @@ struct MediumWidgetView: View {
     }
 }
 
-/// Small: one tracker. Running → stop + Pixel timer; idle → play + mono total "/goal".
+enum SquareWidgetStyle {
+    case home, standby, night
+}
+
+/// Small: one tracker. Running → ⇄ + Pixel timer; idle → play + mono total "/goal".
 struct SmallWidgetView: View {
     let tracker: TrackerSnapshot
     /// Another tracker is running (Play switches instead of starting fresh).
     var somethingRunning = false
     var now: Date
+    var style: SquareWidgetStyle = .home
+    var bezel = true
+
+    private var night: Bool { style == .night }
+    private var ink: Color { night ? .white : CH.onAccent }
 
     var body: some View {
         let t = tracker
-        let accent = t.color.accent
-        VStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(alignment: .top) {
-                    IconTile(glyph: t.glyph, size: 26, radius: 8, glyphSize: 14)
-                    Spacer(minLength: 0)
-                    if t.isRunning {
-                        IntentButton(intent: WidgetStopTrackerIntent(), accessibility: "Stop \(t.name)") {
-                            SurfaceStopGlyph(size: 34, accent: accent)
-                        }
-                    } else {
-                        WidgetPlayButton(tracker: t, somethingRunning: somethingRunning) {
-                            PlayButton(size: 34)
-                        }
-                    }
-                }
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top) {
+                IconTile(glyph: t.glyph, size: 26, radius: 8, glyphSize: 14,
+                         foreground: ink, background: night ? Color.white.opacity(0.12) : CH.iconTileFill)
+                    .padding(.top, 2)
                 Spacer(minLength: 0)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(t.name)
-                        .geist(13, .semibold, lineHeight: 16)
-                        .foregroundStyle(Color.black.opacity(0.7))
-                        .lineLimit(1)
-                    if let start = t.runningStart {
-                        LiveTimerText(start: start, style: .compact, now: now)
-                            .geistPixel(40)
-                            .foregroundStyle(CH.onAccent)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                    } else {
-                        HStack(alignment: .firstTextBaseline, spacing: 3) {
-                            Text(Fmt.hm(t.periodTotal(at: now)))
-                                .geistMono(30, .medium, tracking: -0.05, lineHeight: 34)
-                                .foregroundStyle(CH.onAccent)
-                                .numericMorph()
-                            if t.hasGoal {
-                                Text("/\(Fmt.hm(t.goal))")
-                                    .geistMono(12, .medium, tracking: -0.02, lineHeight: 16)
-                                    .foregroundStyle(Color.black.opacity(0.55))
-                            }
-                        }
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
+                if t.isRunning {
+                    WidgetSwitchButton {
+                        SurfaceSwapGlyph(size: 42, foreground: night ? .white : t.color.accent,
+                                         background: night ? .clear : .black)
+                            .overlay { if night { Circle().strokeBorder(.white, lineWidth: 2) } }
+                    }
+                } else {
+                    WidgetPlayButton(tracker: t, somethingRunning: somethingRunning) {
+                        PlayButton(size: 42, background: night ? .clear : .black)
+                            .overlay { if night { Circle().strokeBorder(.white, lineWidth: 2) } }
                     }
                 }
             }
-            .padding(12)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-            .background(accent, in: RoundedRectangle(cornerRadius: 21, style: .continuous))
-
-            if t.hasGoal {
-                SegmentStrip(count: 12, fraction: t.progress(at: now), accent: accent, height: 5, animated: false)
-                    .padding(EdgeInsets(top: 0, leading: 14, bottom: 0, trailing: 12))
+            Spacer(minLength: 0)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(t.name)
+                    .geist(13, .semibold, lineHeight: 16)
+                    .foregroundStyle(ink.opacity(0.7))
+                    .lineLimit(1)
+                if let start = t.runningStart {
+                    LiveTimerText(start: start, style: .compact, now: now)
+                        .geistPixel(50)
+                        .foregroundStyle(ink)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                } else {
+                    HStack(alignment: .firstTextBaseline, spacing: 3) {
+                        Text(Fmt.hm(t.periodTotal(at: now)))
+                            .geistMono(34, .medium, tracking: -0.05, lineHeight: 50)
+                            .foregroundStyle(ink)
+                            .numericMorph()
+                        if t.hasGoal {
+                            Text("/\(Fmt.hm(t.goal))")
+                                .geistMono(13, .medium, tracking: -0.02, lineHeight: 16)
+                                .foregroundStyle(ink.opacity(0.55))
+                        }
+                    }
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                }
             }
         }
-        .padding(EdgeInsets(top: 5, leading: 5, bottom: t.hasGoal ? 12 : 5, trailing: 5))
+        .padding(EdgeInsets(top: 14, leading: 14, bottom: 12, trailing: 12))
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .background {
+            let block = RoundedRectangle(cornerRadius: 21, style: .continuous)
+            if night {
+                block.strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
+            } else {
+                block.fill(t.color.accent)
+            }
+        }
+        .padding(bezel ? 5 : 0)
+    }
+}
+
+struct WidgetSwitchButton<Label: View>: View {
+    @ViewBuilder var label: Label
+
+    var body: some View {
+        if #available(iOS 18.0, *) {
+            Button(intent: OpenURLIntent(ChoppedLink.switcher)) { label }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Switch tracker")
+        } else {
+            SwitchLink { label }
+        }
     }
 }
 
