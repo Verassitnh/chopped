@@ -31,12 +31,16 @@ struct LiveTimerText: View {
     private var overHour: Bool { pastHour || now.timeIntervalSince(start) >= 3600 }
 
     var body: some View {
+        text.monospacedDigit()
+    }
+
+    private var text: Text {
         if AppClock.isFrozen {
-            Text(style == .hms ? Fmt.hms(now.timeIntervalSince(start)) : Fmt.compact(now.timeIntervalSince(start)))
+            return Text(style == .hms ? Fmt.hms(now.timeIntervalSince(start)) : Fmt.compact(now.timeIntervalSince(start)))
         } else if #available(iOS 18.0, *) {
             let stopwatch = SystemFormatStyle.Stopwatch(startingAt: start, showsHours: true, maxFieldCount: 3,
                                                         maxPrecision: .seconds(1))
-            switch (style, overHour) {
+            return switch (style, overHour) {
             case (.hms, false):
                 // "00:" + "00:57" → "00:00:57"
                 Text("00:") + Text(.currentDate, format: stopwatch)
@@ -54,7 +58,7 @@ struct LiveTimerText: View {
                 Text(timerInterval: start...Date.distantFuture, countsDown: false)
             }
         } else {
-            Text(timerInterval: start...Date.distantFuture, countsDown: false)
+            return Text(timerInterval: start...Date.distantFuture, countsDown: false)
         }
     }
 }

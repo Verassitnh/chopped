@@ -50,6 +50,7 @@ struct MediumWidgetView: View {
                     .foregroundStyle(CH.onAccent)
                     .multilineTextAlignment(.trailing)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.85)
                     .frame(maxWidth: 130, alignment: .trailing)
                     .fixedSize(horizontal: AppClock.isFrozen, vertical: false)
                 WidgetSwitchButton {

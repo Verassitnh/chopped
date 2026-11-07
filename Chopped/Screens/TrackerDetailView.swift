@@ -277,7 +277,7 @@ private struct DetailHeader: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                    Text(Fmt.hms(running ? elapsed : total))
+                    Text(Fmt.hms(running ? elapsed : total)).monospacedDigit()
                         .geistPixel(92, lineHeight: 90)
                         .foregroundStyle(CH.onAccent)
                         .lineLimit(1)

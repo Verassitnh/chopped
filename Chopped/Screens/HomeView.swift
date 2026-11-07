@@ -241,7 +241,7 @@ struct TrackerCard: View {
                         .foregroundStyle(palette.text)
                         .lineLimit(1)
                 }
-                Text(Fmt.hms(elapsed))
+                Text(Fmt.hms(elapsed)).monospacedDigit()
                     .geistPixel(62)
                     .foregroundStyle(palette.text)
                     .lineLimit(1)
