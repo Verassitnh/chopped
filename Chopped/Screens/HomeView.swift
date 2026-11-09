@@ -8,7 +8,7 @@ struct HomeView: View {
     @Environment(AppRouter.self) private var router
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var pendingDelete: Activity?
-    @AppStorage(Tagline.enabledKey) private var showTagline = true
+    @AppStorage(Tagline.disabledKey) private var taglineDisabled = false
 
     var body: some View {
         // A plain List (styled to look like the stacked cards) so each card gets the native
@@ -83,7 +83,7 @@ struct HomeView: View {
             GlassCircleButton(glyph: .person, glyphSize: 18) { router.showingSettings = true }
                 .accessibilityLabel("Settings")
             Group {
-                if showTagline {
+                if !taglineDisabled {
                     let tagline = Tagline.forDay(now)
                     Text(tagline)
                         .geist(20, .medium, tracking: -0.02, lineHeight: 26)
@@ -96,9 +96,9 @@ struct HomeView: View {
                         .foregroundStyle(CH.text)
                 }
             }
-            .lineLimit(1)
-            .minimumScaleFactor(0.8)
-            .frame(maxWidth: .infinity)
+            .multilineTextAlignment(.leading)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
             GlassCircleButton(glyph: .plus) { router.showingNewTracker = true }
                 .accessibilityLabel("New tracker")
         }

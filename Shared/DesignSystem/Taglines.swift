@@ -2,7 +2,7 @@ import Foundation
 
 /// The Home header line under the date: one per local calendar day, picked from `all`.
 enum Tagline {
-    static let enabledKey = "showDailyMessage"
+    static let disabledKey = "disableTaglineMessage"
 
     /// Exact copy, lowercase. The first is the design's (and the fixed QC/demo) line.
     static let all = [
