@@ -46,7 +46,7 @@ struct MediumWidgetView: View {
             .lineLimit(1)
             .frame(maxWidth: .infinity, alignment: .leading)
             if let start = t.runningStart {
-                LiveTimerText(start: start, style: .compact, now: now)
+                LiveTimerText(start: start, now: now)
                     .geistPixel(34)
                     .foregroundStyle(CH.onAccent)
                     .multilineTextAlignment(.trailing)
@@ -137,7 +137,7 @@ struct SmallWidgetView: View {
                     .foregroundStyle(ink.opacity(0.7))
                     .lineLimit(1)
                 if let start = t.runningStart {
-                    LiveTimerText(start: start, style: .compact, now: now)
+                    LiveTimerText(start: start, now: now)
                         .geistPixel(50)
                         .foregroundStyle(ink)
                         .lineLimit(1)
