@@ -2,23 +2,37 @@ import Foundation
 
 /// The Home header line under the date: one per local calendar day, picked from `all`.
 enum Tagline {
+    static let enabledKey = "showDailyMessage"
+
     /// Exact copy, lowercase. The first is the design's (and the fixed QC/demo) line.
     static let all = [
         "lock in twin",
         "don't be chopped",
         "be better",
         "generational lock in",
-        "best in your bloodline",
-        "goated chad",
+        "centennial lock in",
         "stop chud maxxing",
         "get cracked",
         "no more skill issues",
         "be better dog",
-        "keep crackin big dog",
         "shut up and lock in",
         "absolute chud",
         "don't be a whale",
-        "be better king",
+        "calm down, you're mid",
+        "phone down chud",
+        "nobody's coming twin",
+        "you're not him",
+        "npc behavior detected",
+        "mid is a choice",
+        "so cooked",
+        "eat your humble pie",
+        "certified bum",
+        "you're average at best",
+        "stop fumbling",
+        "invited to the losers club",
+        "don't be the npc",
+        "average bench is 315",
+        "end your losing streak",
     ]
 
     /// Today's line: stable through the day and across launches, changes at local midnight.

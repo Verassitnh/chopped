@@ -52,7 +52,7 @@ struct ChoppedApp: App {
     /// 1.5s for plain screens; sheets/pushes get extra time to finish presenting.
     private var snapshotDelay: TimeInterval {
         switch QC.screen {
-        case .detail, .newTracker, .trackerStats, .switcher: 2.2
+        case .detail, .newTracker, .trackerStats, .switcher, .settings: 2.2
         default: 1.5
         }
     }
