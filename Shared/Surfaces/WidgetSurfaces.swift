@@ -4,7 +4,8 @@ import SwiftUI
 // MARK: - 07 Home-screen widgets (Paper B7U-0)
 //
 // These views draw the whole widget including its bezel (5pt inset). The widget extension sets the
-// bezel colour as `containerBackground` and disables content margins; the QC host clips them to r26.
+// bezel colour as `containerBackground` and disables content margins. Inner blocks use
+// `ContainerRelativeShape` so they stay concentric with the system's widget corners.
 
 /// Medium: running (or first) tracker block + up to 3 tracker rows with play buttons.
 struct MediumWidgetView: View {
@@ -67,7 +68,7 @@ struct MediumWidgetView: View {
             }
         }
         .padding(EdgeInsets(top: 10, leading: 12, bottom: 10, trailing: 10))
-        .background(t.color.accent, in: RoundedRectangle(cornerRadius: 21, style: .continuous))
+        .background(t.color.accent, in: ContainerRelativeShape())
     }
 
     private func row(_ t: TrackerSnapshot) -> some View {
@@ -161,7 +162,7 @@ struct SmallWidgetView: View {
         .padding(EdgeInsets(top: 14, leading: 14, bottom: 12, trailing: 12))
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         .background {
-            let block = RoundedRectangle(cornerRadius: 21, style: .continuous)
+            let block = ContainerRelativeShape()
             if night {
                 block.strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
             } else {
