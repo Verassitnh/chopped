@@ -63,7 +63,7 @@ Launch arguments render any screen with deterministic demo data that matches the
 
 ```sh
 xcrun simctl launch <sim> com.jackson.chopped -QCDemo -QCScreen home -QCSnapshot
-# screens: home | detail | newTracker | stats | trackerStats | widgets | liveActivity | island
+# screens: home | detail | newTracker | switcher | settings | stats | trackerStats | widgets | liveActivity | island
 # add -QCFullPage for full scroll height
 ```
 

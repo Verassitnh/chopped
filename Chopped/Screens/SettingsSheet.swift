@@ -5,6 +5,7 @@ struct SettingsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage(BreakSettings.minutesKey, store: BreakSettings.defaults) private var breakMinutes = BreakSettings.minutes
     @AppStorage(AppGroup.liveActivityTitlesKey, store: AppGroup.defaults) private var liveActivityTitles = false
+    @AppStorage(Tagline.enabledKey) private var showTagline = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -20,6 +21,18 @@ struct SettingsSheet: View {
             }
             .padding(.horizontal, 16)
             .padding(.top, 16)
+
+            SectionLabelText("Home")
+                .padding(.horizontal, 24)
+                .padding(.top, 28)
+                .padding(.bottom, 10)
+
+            row("Daily message") {
+                Toggle("Daily message", isOn: $showTagline).labelsHidden()
+            }
+            .padding(.horizontal, 16)
+            .background(CH.raised, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .padding(.horizontal, 20)
 
             SectionLabelText("Live Activity")
                 .padding(.horizontal, 24)

@@ -53,6 +53,7 @@ final class AppRouter {
         case .trackerStats: tab = .stats; statsPath = target.map { [$0] } ?? []
         case .newTracker: tab = .track; showingNewTracker = true
         case .switcher: tab = .track; qcPendingSwitcher = true
+        case .settings: tab = .track; showingSettings = true
         }
     }
 }

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 01 Home (Paper AB6-0): date + tagline header with the glass "+" button, then one C3.2 card per
+/// 01 Home (Paper AB6-0): profile button, daily tagline (or "Chopped") and the glass "+" button, then one C3.2 card per
 /// tracker. The running tracker gets the tall card (Pixel timer + Stop); the rest show their
 /// period total + Play. Tap a card for the detail sheet (02); "+" opens New tracker (05).
 struct HomeView: View {
@@ -8,6 +8,7 @@ struct HomeView: View {
     @Environment(AppRouter.self) private var router
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var pendingDelete: Activity?
+    @AppStorage(Tagline.enabledKey) private var showTagline = true
 
     var body: some View {
         // A plain List (styled to look like the stacked cards) so each card gets the native
@@ -78,38 +79,30 @@ struct HomeView: View {
     // MARK: Header
 
     private func header(now: Date) -> some View {
-        HStack(alignment: .bottom) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(Self.dateLine(now))
-                    .geist(13, .medium, lineHeight: 16)
-                    .foregroundStyle(CH.textSecondary)
-                let tagline = Tagline.forDay(now)
-                Text(tagline)
-                    .geist(20, .medium, tracking: -0.02, lineHeight: 26)
-                    .foregroundStyle(CH.textMuted)
-                    .lineLimit(1)
-                    .contentTransition(.opacity)   // crossfade when the day rolls over while open
-                    .animation(.easeInOut(duration: 0.4), value: tagline)
+        HStack(spacing: 12) {
+            GlassCircleButton(glyph: .person, glyphSize: 18) { router.showingSettings = true }
+                .accessibilityLabel("Settings")
+            Group {
+                if showTagline {
+                    let tagline = Tagline.forDay(now)
+                    Text(tagline)
+                        .geist(20, .medium, tracking: -0.02, lineHeight: 26)
+                        .foregroundStyle(CH.textMuted)
+                        .contentTransition(.opacity)
+                        .animation(.easeInOut(duration: 0.4), value: tagline)
+                } else {
+                    Text("Chopped")
+                        .geist(20, .semibold, tracking: -0.02, lineHeight: 26)
+                        .foregroundStyle(CH.text)
+                }
             }
-            .frame(height: 46)   // 16 + 4 + 26, pinned so fractional line-height padding can't drift
-            Spacer(minLength: 12)
-            HStack(spacing: 10) {
-                GlassCircleButton(glyph: .sliders, glyphSize: 18) { router.showingSettings = true }
-                    .accessibilityLabel("Settings")
-                GlassCircleButton(glyph: .plus) { router.showingNewTracker = true }
-                    .accessibilityLabel("New tracker")
-            }
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .frame(maxWidth: .infinity)
+            GlassCircleButton(glyph: .plus) { router.showingNewTracker = true }
+                .accessibilityLabel("New tracker")
         }
         .padding(EdgeInsets(top: 20, leading: 20, bottom: 22, trailing: 20))
-    }
-
-    /// "Friday, 23 October".
-    static func dateLine(_ date: Date) -> String {
-        let f = DateFormatter()
-        f.calendar = .chopped
-        f.locale = Locale(identifier: "en_GB")
-        f.dateFormat = "EEEE, d MMMM"
-        return f.string(from: date)
     }
 
     private var emptyState: some View {
