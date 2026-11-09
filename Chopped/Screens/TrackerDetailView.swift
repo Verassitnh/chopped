@@ -274,7 +274,8 @@ private struct DetailHeader: View {
         let total = store.periodTotal(for: a, now: now)
         let elapsed = session.map { now.timeIntervalSince($0.start) } ?? 0
         let breakOver = breakEnd.map { now >= $0 } ?? false
-        let timer = breakEnd.map { abs($0.timeIntervalSince(now)) } ?? (running ? elapsed : total)
+        let breakTimer = breakSession.flatMap { b in breakEnd.map { breakOver ? now.timeIntervalSince(b.start) : $0.timeIntervalSince(now) } }
+        let timer = breakTimer ?? (running ? elapsed : total)
         let accent = breakSession != nil ? TrackerColor.breakGreen.accent : a.color.accent
 
         VStack(spacing: 0) {
@@ -311,7 +312,7 @@ private struct DetailHeader: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                    Text((breakOver ? "+" : "") + Fmt.hms(timer)).monospacedDigit()
+                    Text(Fmt.hms(timer)).monospacedDigit()
                         .geistPixel(92, lineHeight: 90)
                         .foregroundStyle(CH.onAccent)
                         .lineLimit(1)
@@ -411,7 +412,7 @@ private struct DetailHeader: View {
     private func statusLine(running: Bool, session: WorkSession?, breakEnd: Date?) -> String {
         if running { return "Clocked in · \(Fmt.time(session?.start ?? now))" }
         if let breakEnd {
-            return now >= breakEnd ? "Break over · since \(Fmt.time(breakEnd))" : "On break · ends \(Fmt.time(breakEnd))"
+            return now >= breakEnd ? "On break · +\(Fmt.timer(now.timeIntervalSince(breakEnd))) over" : "On break · ends \(Fmt.time(breakEnd))"
         }
         return activity.period == .day ? "Today so far" : "This \(activity.period.rawValue) so far"
     }

@@ -202,7 +202,6 @@ enum ChoppedData {
         db.exec("UPDATE sessions SET end = ? WHERE end IS NULL", [date.timeIntervalSince1970])
         db.exec("INSERT INTO sessions (activity_id, start) VALUES (?, ?)", [trackerID, date.timeIntervalSince1970])
         db.exec("COMMIT")
-        BreakNotice.cancel()
         return true
     }
 
@@ -211,7 +210,6 @@ enum ChoppedData {
     static func stop(at date: Date = Date()) -> Bool {
         guard let url = ChoppedDB.existingURL, let db = Connection(url: url, readOnly: false) else { return false }
         db.exec("UPDATE sessions SET end = ? WHERE end IS NULL", [date.timeIntervalSince1970])
-        BreakNotice.cancel()
         return true
     }
 
