@@ -69,7 +69,8 @@ struct SwitchSheet: View {
 
     private func card(_ a: Activity, now: Date, at: Date) -> some View {
         Button { switchTo(a, at: at, now: now) } label: {
-            TrackerCard(activity: a, now: now, startsAt: at > now ? at : nil,
+            TrackerCard(activity: a, now: now,
+                        scheduledLine: at > now ? "Starts \(Fmt.clock(at)) · " + (a.hasGoal ? "\(Fmt.goal(minutes: a.goalMinutes)) goal" : a.goalLine) : nil,
                         start: { switchTo(a, at: at, now: now) }, stop: {}, showsBreak: false)
                 .contentShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
         }
