@@ -27,7 +27,7 @@ struct RootView: View {
             .tag(AppTab.stats)
         }
         .tint(.white)
-        .transaction { $0.animation = nil }  // tab switches are instant
+        .transaction(value: router.tab) { $0.animation = nil }
         .sheet(item: $router.detailActivityID) { id in
             TrackerDetailView(activityID: id)
         }

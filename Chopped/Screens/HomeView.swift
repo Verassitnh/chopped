@@ -8,7 +8,15 @@ struct HomeView: View {
     @Environment(AppRouter.self) private var router
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var pendingDelete: Activity?
+    @State private var switching: Switching?
+    @State private var bumps: [Int64: Int] = [:]
     @AppStorage(Tagline.disabledKey) private var taglineDisabled = false
+
+    private struct Switching: Equatable {
+        let date: Date
+        let toID: Int64?
+        let fromID: Int64?
+    }
 
     var body: some View {
         // A plain List (styled to look like the stacked cards) so each card gets the native
@@ -18,21 +26,21 @@ struct HomeView: View {
                 .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
-            let scheduled = store.scheduledSwitch
             let running = store.activeActivity
-            let trackers = ordered(scheduled: scheduled, running: running)
-            if let scheduled, running == nil {
-                relayRow(scheduled, from: nil, top: 4)
-            }
+            let scheduled = store.scheduledSwitch
+            let trackers = switching.map { ordered(next: $0.toID, after: $0.fromID) }
+                ?? ordered(next: scheduled?.to?.id, after: running?.id)
             ForEach(Array(trackers.enumerated()), id: \.element.id) { index, a in
                 let isRunning = running?.id == a.id
-                let isNext = scheduled?.to?.id == a.id
+                let schedule = cardSchedule(for: a, scheduled: scheduled, running: running)
                 // The card is a Button (press feedback: 0.98 spring, off with Reduce Motion); its
                 // Play/Stop are separate Buttons inside the label, so they take their own taps.
                 Button { router.openDetail(a.id) } label: {
                     Ticker(every: isRunning || store.isOnBreak(a.id) ? 1 : 60) { now in
                         TrackerCard(activity: a, now: now,
-                                    scheduledLine: isNext ? scheduledLine(scheduled, running: running) : nil,
+                                    scheduledLine: schedule != nil && !isRunning ? scheduledLine(scheduled, running: running) : nil,
+                                    schedule: schedule,
+                                    cancelSchedule: { cancelSchedule(bumping: a.id) },
                                     start: { toggle { store.clockIn(a) } },
                                     stop: { toggle { store.stop() } },
                                     takeBreak: { toggle { store.takeBreak(a) } },
@@ -41,20 +49,17 @@ struct HomeView: View {
                     .contentShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
                 }
                 .buttonStyle(PressScaleStyle(scale: 0.98))
+                .modifier(CardBump(trigger: bumps[a.id] ?? 0))
                 .accessibilityHint("Opens tracker details")
                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                     Button { pendingDelete = a } label: { Label("Delete", systemImage: "trash.fill") }
                         .tint(Color(hex: "#FF453A"))
                 }
                 // 14pt between cards (7 + 7), 4pt above the first, 24pt below the last.
-                .listRowInsets(EdgeInsets(top: index == 0 && !(isNext && running == nil) ? 4 : (isNext ? 0 : 7), leading: 12,
-                                          bottom: index == trackers.count - 1 ? 24 : (isRunning && scheduled != nil ? 0 : 7),
-                                          trailing: 12))
+                .listRowInsets(EdgeInsets(top: index == 0 ? 4 : 7, leading: 12,
+                                          bottom: index == trackers.count - 1 ? 24 : 7, trailing: 12))
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
-                if isRunning, let scheduled {
-                    relayRow(scheduled, from: a, top: 0)
-                }
             }
             if store.trackers.isEmpty {
                 emptyState
@@ -68,6 +73,15 @@ struct HomeView: View {
         .environment(\.defaultMinListRowHeight, 0)
         .scrollIndicators(.hidden)
         .background(CH.bg)
+        .task(id: store.scheduledSwitch?.date) { await runSwitch() }
+        .task { await scheduleDemo() }
+        .onChange(of: store.scheduledSwitch) { old, new in
+            guard let id = new?.to?.id ?? (new != nil ? store.activeActivity?.id : nil), new?.date != old?.date else { return }
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(0.3))
+                bump(id)
+            }
+        }
         .alert("Delete \(pendingDelete?.name ?? "tracker")?",
                isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
                presenting: pendingDelete) { a in
@@ -85,11 +99,45 @@ struct HomeView: View {
         }
     }
 
-    private func ordered(scheduled: Store.ScheduledSwitch?, running: Activity?) -> [Activity] {
+    private func cardSchedule(for a: Activity, scheduled: Store.ScheduledSwitch?, running: Activity?) -> CardSchedule? {
+        guard let scheduled else { return nil }
+        let owner = scheduled.to?.id ?? running?.id
+        guard owner == a.id else { return nil }
+        return CardSchedule(date: scheduled.date, done: switching?.date == scheduled.date)
+    }
+
+    private func runSwitch() async {
+        guard let scheduled = store.scheduledSwitch else { return }
+        let lead = reduceMotion ? 0 : CardMotion.successLead
+        try? await Task.sleep(for: .seconds(max(0, scheduled.date.timeIntervalSince(AppClock.now) - lead)))
+        guard !Task.isCancelled, store.scheduledSwitch?.date == scheduled.date else { return }
+        let marker = Switching(date: scheduled.date, toID: scheduled.to?.id, fromID: store.activeActivity?.id)
+        switching = marker
+        try? await Task.sleep(for: .seconds(max(0, scheduled.date.timeIntervalSince(AppClock.now))))
+        Task { @MainActor in
+            withAnimation(reduceMotion ? nil : CardMotion.resize) { store.refresh() }
+            try? await Task.sleep(for: .seconds(0.45))
+            if switching == marker {
+                withAnimation(reduceMotion ? nil : CardMotion.resize) { switching = nil }
+            }
+        }
+    }
+
+    private func bump(_ id: Int64) {
+        guard !reduceMotion else { return }
+        bumps[id, default: 0] += 1
+    }
+
+    private func cancelSchedule(bumping id: Int64) {
+        bump(id)
+        toggle { store.cancelScheduledSwitch() }
+    }
+
+    private func ordered(next: Int64?, after fromID: Int64?) -> [Activity] {
         var list = store.trackers
-        guard let next = scheduled?.to, let i = list.firstIndex(where: { $0.id == next.id }) else { return list }
+        guard let next, let i = list.firstIndex(where: { $0.id == next }) else { return list }
         let moved = list.remove(at: i)
-        let at = running.flatMap { r in list.firstIndex { $0.id == r.id }.map { $0 + 1 } } ?? 0
+        let at = fromID.flatMap { id in list.firstIndex { $0.id == id }.map { $0 + 1 } } ?? 0
         list.insert(moved, at: at)
         return list
     }
@@ -99,15 +147,28 @@ struct HomeView: View {
         return running == nil ? "Starts at \(Fmt.clock(scheduled.date))" : "Takes over at \(Fmt.clock(scheduled.date))"
     }
 
-    private func relayRow(_ scheduled: Store.ScheduledSwitch, from: Activity?, top: CGFloat) -> some View {
-        RelayMarker(scheduled: scheduled, from: from) { toggle { store.cancelScheduledSwitch() } }
-            .listRowInsets(EdgeInsets(top: top, leading: 12, bottom: 0, trailing: 12))
-            .listRowBackground(Color.clear)
-            .listRowSeparator(.hidden)
+    private func scheduleDemo() async {
+        guard let mode = QC.scheduleDemo, let meetings = store.trackers.first(where: { $0.name == "Meetings" }) else { return }
+        if mode == "switch" {
+            if let frozen = AppClock.frozen {
+                AppClock.frozen = nil
+                AppClock.offset = frozen.timeIntervalSince(Date())
+            }
+            try? await Task.sleep(for: .seconds(1))
+            toggle { store.clockIn(meetings, at: AppClock.now.addingTimeInterval(2.5)) }
+            return
+        }
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(1.2))
+            toggle { store.clockIn(meetings, at: AppClock.now.addingTimeInterval(12 * 60)) }
+            try? await Task.sleep(for: .seconds(2.4))
+            cancelSchedule(bumping: meetings.id)
+            try? await Task.sleep(for: .seconds(1.4))
+        }
     }
 
     private func toggle(_ change: () -> Void) {
-        withAnimation(reduceMotion ? nil : Motion.spring, change)
+        withAnimation(reduceMotion ? nil : CardMotion.resize, change)
     }
 
     // MARK: Header
@@ -133,6 +194,20 @@ struct HomeView: View {
             .multilineTextAlignment(.leading)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
+            if store.activeSession != nil || store.activeBreak != nil {
+                Button { toggle { store.stop() } } label: {
+                    GlassSurface(shape: Circle())
+                        .frame(width: 44, height: 44)
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 3.5, style: .continuous).fill(Color(hex: "#FF453A"))
+                                .frame(width: 14, height: 14)
+                        }
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.pressScale)
+                .accessibilityLabel("Clock out")
+                .transition(.scale(scale: 0.6).combined(with: .opacity))
+            }
             GlassCircleButton(glyph: .plus) { router.showingNewTracker = true }
                 .accessibilityLabel("New tracker")
         }
@@ -160,6 +235,8 @@ struct TrackerCard: View {
     let activity: Activity
     let now: Date
     var scheduledLine: String? = nil
+    var schedule: CardSchedule? = nil
+    var cancelSchedule: (() -> Void)? = nil
     var start: () -> Void
     var stop: () -> Void
     var takeBreak: (() -> Void)? = nil
@@ -255,7 +332,7 @@ struct TrackerCard: View {
                 idleRow(a, over: over, drained: drained)
             }
         }
-        .transition(.opacity)
+        .transition(.cardContent)
     }
 
     private struct Palette {
@@ -312,13 +389,33 @@ struct TrackerCard: View {
                 .minimumScaleFactor(0.8)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            if let takeBreak {
-                BreakStopControl(accent: a.color.accent, takeBreak: takeBreak, stop: stop)
-            } else {
-                StopButton(accent: a.color.accent, action: stop)
+            ZStack {
+                if schedule != nil {
+                    CardActionButton(mode: actionMode, size: 52, action: cancelSchedule ?? {})
+                        .transition(.blurSwap(dy: 0))
+                } else if let takeBreak, let openSwitcher {
+                    BreakSwitchControl(accent: a.color.accent, takeBreak: takeBreak, openSwitcher: openSwitcher)
+                        .transition(.blurSwap(dy: 0))
+                } else {
+                    StopButton(accent: a.color.accent, action: stop)
+                }
             }
+            .animation(CardMotion.swap, value: schedule?.date)
         }
         .padding(EdgeInsets(top: 14, leading: 16, bottom: 14, trailing: 14))
+        .background { stripes }
+    }
+
+    private var actionMode: CardActionButton.Mode {
+        guard let schedule else { return .play }
+        return schedule.done ? .done : .cancel
+    }
+
+    private var stripes: some View {
+        ScheduleStripes()
+            .opacity(schedule == nil ? 0 : 1)
+            .animation(.easeInOut(duration: 0.25), value: schedule == nil)
+            .clipShape(RoundedRectangle(cornerRadius: 21, style: .continuous))
     }
 
     // MARK: Idle
@@ -337,25 +434,37 @@ struct TrackerCard: View {
                     if let over {
                         Text("\(a.period.adjective) · \(Fmt.goal(minutes: a.goalMinutes)) · ") + overText(over, palette)
                     } else if let scheduledLine {
-                        Text(scheduledLine)
+                        Text(scheduledLine).transition(.asymmetric(insertion: .blurSwap(dy: 4), removal: .blurSwap(dy: -4)))
                     } else {
-                        Text(metaLine(a))
+                        Text(metaLine(a)).transition(.asymmetric(insertion: .blurSwap(dy: 4), removal: .blurSwap(dy: -4)))
                     }
                 }
                 .geist(13, .medium, lineHeight: 17)
                 .foregroundStyle(palette.meta)
                 .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .animation(CardMotion.textSwap, value: scheduledLine)
             }
             .frame(maxWidth: .infinity, minHeight: 40, maxHeight: 40, alignment: .leading)   // 22 + 1 + 17
-            Text(Fmt.hm(total))
-                .geistMono(26, .medium, tracking: -0.05, lineHeight: 30)
-                .foregroundStyle(palette.text)
-                .lineLimit(1)
-                .fixedSize()
-                .contentTransition(.numericText())
-            PlayButton(action: start)
+            ZStack(alignment: .trailing) {
+                if let schedule {
+                    ScheduleTime(date: schedule.date, color: palette.text)
+                        .transition(.asymmetric(insertion: .blurSwap(dy: 4), removal: .blurSwap(dy: -4)))
+                } else {
+                    Text(Fmt.hm(total))
+                        .geistMono(26, .medium, tracking: -0.05, lineHeight: 30)
+                        .foregroundStyle(palette.text)
+                        .lineLimit(1)
+                        .fixedSize()
+                        .contentTransition(.numericText())
+                        .transition(.asymmetric(insertion: .blurSwap(dy: 4), removal: .blurSwap(dy: -4)))
+                }
+            }
+            .animation(CardMotion.textSwap, value: schedule?.date)
+            CardActionButton(mode: actionMode, action: schedule == nil ? start : (cancelSchedule ?? {}))
         }
         .padding(EdgeInsets(top: 12, leading: 14, bottom: 12, trailing: 12))
+        .background { stripes }
     }
 
     /// "Weekly · 8h goal", or "Daily · 45m · 6-day streak" once a streak is worth showing.
@@ -435,10 +544,10 @@ struct BreakCard: View {
     }
 }
 
-struct BreakStopControl: View {
+struct BreakSwitchControl: View {
     let accent: Color
     var takeBreak: () -> Void
-    var stop: () -> Void
+    var openSwitcher: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
@@ -450,61 +559,15 @@ struct BreakStopControl: View {
             .buttonStyle(.pressScale)
             .accessibilityLabel("Take a break")
             Color.white.opacity(0.14).frame(width: 22, height: 1)
-            Button(action: stop) {
-                RoundedRectangle(cornerRadius: 4, style: .continuous).fill(accent)
-                    .frame(width: 16, height: 16)
+            Button(action: openSwitcher) {
+                GlyphView(.swap, size: 22, color: accent, strokeWidth: 2.5)
                     .frame(width: 52, height: 44)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.pressScale)
-            .accessibilityLabel("Stop")
+            .accessibilityLabel("Switch tracker")
         }
         .padding(.vertical, 6)
         .background(.black, in: Capsule())
-    }
-}
-
-struct RelayMarker: View {
-    let scheduled: Store.ScheduledSwitch
-    let from: Activity?
-    let cancel: () -> Void
-
-    var body: some View {
-        HStack(spacing: 10) {
-            line(from?.color.accent ?? CH.pastMid, leading: false)
-            HStack(spacing: 8) {
-                Text(scheduled.to == nil ? "Clock out · \(Fmt.clock(scheduled.date))" : Fmt.clock(scheduled.date))
-                    .geistMono(13, .medium, tracking: -0.02, lineHeight: 16)
-                    .monospacedDigit()
-                    .foregroundStyle(CH.text)
-                Button(action: cancel) {
-                    Circle()
-                        .fill(Color.white.opacity(0.08))
-                        .frame(width: 20, height: 20)
-                        .overlay { GlyphView(.close, size: 8, color: CH.textMuted) }
-                        .frame(width: 32, height: 32)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.pressScale)
-                .padding(.vertical, -6)
-                .accessibilityLabel("Cancel scheduled switch")
-            }
-            .padding(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 8))
-            .background(CH.raised, in: Capsule())
-            .overlay { Capsule().strokeBorder(Color.white.opacity(0.08)) }
-            line(scheduled.to?.color.accent ?? CH.pastMid, leading: true)
-        }
-        .padding(.horizontal, 10)
-        .frame(height: 44)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(scheduled.to.map { "Switches to \($0.name) at \(Fmt.clock(scheduled.date))" }
-                            ?? "Clocks out at \(Fmt.clock(scheduled.date))")
-    }
-
-    private func line(_ color: Color, leading: Bool) -> some View {
-        Capsule()
-            .fill(LinearGradient(colors: leading ? [color, color.opacity(0)] : [color.opacity(0), color],
-                                 startPoint: .leading, endPoint: .trailing))
-            .frame(height: 2)
     }
 }

@@ -40,6 +40,11 @@ enum QC {
     static let noGoal = args.contains("-QCNoGoal")
 
     static let switchOffset = intArg("-QCSwitchOffset")
+    static let scheduleDemo = stringArg("-QCScheduleDemo")
+
+    private static func stringArg(_ name: String) -> String? {
+        args.firstIndex(of: name).flatMap { i in i + 1 < args.count ? args[i + 1] : nil }
+    }
 
     private static func intArg(_ name: String) -> Int? {
         guard let i = args.firstIndex(of: name), i + 1 < args.count else { return nil }
@@ -68,6 +73,12 @@ enum QC {
                 AppClock.frozen = frozen.addingTimeInterval(TimeInterval(advance * 60))
                 store.refresh(silent: true)
             }
+        }
+        if let seconds = intArg("-QCLiveSwitch"), let meetings = store.trackers.first(where: { $0.name == "Meetings" }),
+           let frozen = AppClock.frozen {
+            AppClock.frozen = nil
+            AppClock.offset = frozen.timeIntervalSince(Date())
+            store.clockIn(meetings, at: AppClock.now.addingTimeInterval(TimeInterval(seconds)))
         }
         if let crossIn, let crossing = DemoData.crossSoon(store) {
             AppClock.frozen = nil
