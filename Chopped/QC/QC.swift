@@ -49,6 +49,7 @@ enum QC {
         let store = DemoData.makeStore()
         if over { DemoData.putOverGoal(store) }
         if noGoal { DemoData.removeGoals(store) }
+        if args.contains("-QCLaps") { DemoData.addLaps(store) }
         if let crossIn, let crossing = DemoData.crossSoon(store) {
             AppClock.frozen = nil
             AppClock.offset = crossing.addingTimeInterval(-crossIn).timeIntervalSince(Date())

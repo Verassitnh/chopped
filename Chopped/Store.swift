@@ -44,6 +44,27 @@ struct WorkSession: Identifiable, Hashable {
     func duration(now: Date) -> TimeInterval { max(0, (end ?? now).timeIntervalSince(start)) }
 }
 
+struct Lap: Identifiable, Hashable {
+    let id: Int64
+    let activityID: Int64
+    var label: String
+    var start: Date
+    var end: Date?
+
+    var isRunning: Bool { end == nil }
+    var title: String { label.isEmpty ? Lap.unlabelled : label }
+
+    static let unlabelled = "Unlabelled"
+}
+
+struct LapTotal: Hashable, Identifiable {
+    let label: String
+    let seconds: TimeInterval
+    let count: Int
+    var title: String { label.isEmpty ? Lap.unlabelled : label }
+    var id: String { label }
+}
+
 /// A total for one calendar bucket (day / week / goal period).
 struct PeriodTotal: Hashable, Identifiable {
     let interval: DateInterval
@@ -119,6 +140,7 @@ final class Store {
     private(set) var activities: [Activity] = []
     /// All sessions, newest first.
     private(set) var sessions: [WorkSession] = []
+    private(set) var laps: [Lap] = []
 
     /// A timer started or stopped (in the app, or by an intent while the app is up). Drives the
     /// start/stop haptic, so it changes exactly once per clock change. Not set by the initial load or
@@ -167,6 +189,83 @@ final class Store {
     func stop(at date: Date = AppClock.now) {
         db.execute("UPDATE sessions SET end = ? WHERE end IS NULL", [date])
         reload()
+    }
+
+    var activeLap: Lap? { laps.first { $0.end == nil } }
+
+    func startLap(_ activity: Activity, label: String) {
+        if !isRunning(activity.id) { clockIn(activity) }
+        let now = AppClock.now
+        db.transaction {
+            db.execute("UPDATE laps SET end = ? WHERE end IS NULL", [now])
+            db.execute("INSERT INTO laps (activity_id, label, start) VALUES (?, ?, ?)",
+                       [activity.id, Store.cleanLabel(label), now])
+        }
+        reload()
+    }
+
+    func endLap(at date: Date = AppClock.now) {
+        db.execute("UPDATE laps SET end = ? WHERE end IS NULL", [date])
+        reload()
+    }
+
+    func updateLap(_ lap: Lap) {
+        db.execute("UPDATE laps SET label = ?, start = ?, end = ? WHERE id = ?",
+                   [Store.cleanLabel(lap.label), lap.start, lap.end, lap.id])
+        reload()
+    }
+
+    func deleteLap(_ lap: Lap) {
+        db.execute("DELETE FROM laps WHERE id = ?", [lap.id])
+        reload()
+    }
+
+    static func cleanLabel(_ label: String) -> String {
+        label.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    }
+
+    func laps(for activityID: Int64, in interval: DateInterval) -> [Lap] {
+        laps.filter {
+            $0.activityID == activityID && $0.start < interval.end && ($0.end ?? .distantFuture) > interval.start
+        }
+    }
+
+    func lapSeconds(_ lap: Lap, in interval: DateInterval? = nil, now: Date) -> TimeInterval {
+        let lower = max(lap.start, interval?.start ?? .distantPast)
+        let upper = min(lap.end ?? now, interval?.end ?? .distantFuture)
+        guard upper > lower else { return 0 }
+        let window = DateInterval(start: lower, end: upper)
+        return sessions(for: lap.activityID, in: window).reduce(0) { $0 + $1.duration(in: window, now: now) }
+    }
+
+    func lapTotals(for activityID: Int64, in interval: DateInterval, now: Date) -> [LapTotal] {
+        var seconds: [String: TimeInterval] = [:]
+        var counts: [String: Int] = [:]
+        for lap in laps(for: activityID, in: interval) {
+            seconds[lap.label, default: 0] += lapSeconds(lap, in: interval, now: now)
+            counts[lap.label, default: 0] += 1
+        }
+        return seconds.map { LapTotal(label: $0.key, seconds: $0.value, count: counts[$0.key] ?? 0) }
+            .sorted { $0.seconds != $1.seconds ? $0.seconds > $1.seconds : $0.title < $1.title }
+    }
+
+    func recentLapLabels(for activityID: Int64, limit: Int = 8) -> [String] {
+        var seen = Set<String>()
+        let ordered = laps.filter { $0.activityID == activityID } + laps.filter { $0.activityID != activityID }
+        return ordered.compactMap { lap in
+            guard !lap.label.isEmpty, seen.insert(lap.label.lowercased()).inserted else { return nil }
+            return lap.label
+        }
+        .prefix(limit).map { $0 }
+    }
+
+    private func settleLaps() {
+        let running = activeSession?.activityID
+        for lap in laps where lap.end == nil && lap.activityID != running {
+            let lastEnd = sessions.filter { $0.activityID == lap.activityID && $0.start < AppClock.now }
+                .compactMap(\.end).max()
+            db.execute("UPDATE laps SET end = ? WHERE id = ?", [max(lap.start, min(lastEnd ?? lap.start, AppClock.now)), lap.id])
+        }
     }
 
     // MARK: Calendar buckets
@@ -432,6 +531,16 @@ final class Store {
         reload()
     }
 
+    func importLaps(_ rows: [(activityID: Int64, label: String, start: Date, end: Date?)]) {
+        db.transaction {
+            for r in rows {
+                db.execute("INSERT INTO laps (activity_id, label, start, end) VALUES (?, ?, ?, ?)",
+                           [r.activityID, r.label, r.start, r.end])
+            }
+        }
+        reload()
+    }
+
     // MARK: Loading
 
     private func reload(silent: Bool = false) {
@@ -444,6 +553,11 @@ final class Store {
         sessions = db.query("SELECT id, activity_id, start, end FROM sessions ORDER BY start DESC") {
             WorkSession(id: $0.int(0), activityID: $0.int(1), start: $0.date(2)!, end: $0.date(3))
         }
+        laps = loadLaps()
+        if laps.contains(where: { $0.end == nil && $0.activityID != activeSession?.activityID }) {
+            settleLaps()
+            laps = loadLaps()
+        }
         let isRunning = activeSession?.id
         if loaded, !silent, isRunning != wasRunning {
             clockEvent = ClockEvent(kind: isRunning == nil ? .stop : .start, serial: (clockEvent?.serial ?? 0) + 1)
@@ -451,6 +565,12 @@ final class Store {
         }
         loaded = true
         syncLiveActivity()
+    }
+
+    private func loadLaps() -> [Lap] {
+        db.query("SELECT id, activity_id, label, start, end FROM laps ORDER BY start DESC") {
+            Lap(id: $0.int(0), activityID: $0.int(1), label: $0.text(2), start: $0.date(3)!, end: $0.date(4))
+        }
     }
 
     /// Re-reads the database (changes made by widgets / Control Center / Live Activity intents).

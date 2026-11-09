@@ -29,6 +29,21 @@ enum DemoData {
         }
     }
 
+    static func addLaps(_ store: Store) {
+        guard let dw = store.activities.first(where: { $0.name == "Deep Work" })?.id else { return }
+        func at(_ d: Int, _ h: Int, _ m: Int) -> Date { date(2026, 10, d, h, m) }
+        store.importLaps([
+            (dw, "Acme · Website", at(19, 9, 0), at(19, 11, 30)),
+            (dw, "Globex", at(19, 13, 30), at(19, 15, 12)),
+            (dw, "Acme · Website", at(20, 9, 0), at(20, 11, 0)),
+            (dw, "", at(20, 13, 30), at(20, 15, 6)),
+            (dw, "Initech", at(21, 9, 0), at(21, 11, 18)),
+            (dw, "Acme · Website", at(22, 14, 0), at(22, 17, 45)),
+            (dw, "Globex", at(23, 9, 0), at(23, 10, 45)),
+            (dw, "Acme · Website", at(23, 20, 6), nil),
+        ])
+    }
+
     static func removeGoals(_ store: Store) {
         for name in ["Deep Work", "Email"] {
             guard var a = store.activities.first(where: { $0.name == name }) else { continue }

@@ -5,7 +5,7 @@ import SwiftUI
 // delete it, or log time after the fact. Moving the start keeps the duration, like Calendar.
 
 /// Shared sheet chrome: X · title · accent ✓, on #141416.
-private struct EditorChrome<Content: View>: View {
+struct EditorChrome<Content: View>: View {
     let title: String
     let accent: Color
     var canSave = true
@@ -48,7 +48,7 @@ private struct EditorChrome<Content: View>: View {
 }
 
 /// Grouped rows on #1C1C1E (r20), 54pt rows, like the detail settings list.
-private struct EditorGroup<Content: View>: View {
+struct EditorGroup<Content: View>: View {
     @ViewBuilder var content: Content
     var body: some View {
         VStack(spacing: 0) { content }
@@ -57,7 +57,7 @@ private struct EditorGroup<Content: View>: View {
     }
 }
 
-private struct EditorRow<Trailing: View>: View {
+struct EditorRow<Trailing: View>: View {
     let title: String
     @ViewBuilder var trailing: Trailing
     var body: some View {
@@ -73,7 +73,7 @@ private struct EditorRow<Trailing: View>: View {
 }
 
 /// Big mono duration readout ("DURATION 2:15").
-private struct DurationReadout: View {
+struct DurationReadout: View {
     let seconds: TimeInterval
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {

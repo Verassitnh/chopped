@@ -33,6 +33,10 @@ enum Fmt {
         return m % 60 == 0 ? "\(m / 60)h" : "\(m / 60)h \(m % 60)m"
     }
 
+    static func decimalHours(_ t: TimeInterval) -> String {
+        String(format: "%.2f h", max(0, t) / 3600)
+    }
+
     /// Goal in minutes → "25h", "45m", "1h 30m".
     static func goal(minutes: Int) -> String { words(TimeInterval(minutes * 60)) }
 

@@ -35,6 +35,16 @@ final class Database {
             )
             """)
         execute("CREATE INDEX IF NOT EXISTS sessions_start ON sessions(start)")
+        execute("""
+            CREATE TABLE IF NOT EXISTS laps (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                activity_id INTEGER NOT NULL REFERENCES activities(id) ON DELETE CASCADE,
+                label TEXT NOT NULL DEFAULT '',
+                start REAL NOT NULL,
+                end REAL
+            )
+            """)
+        execute("CREATE INDEX IF NOT EXISTS laps_start ON laps(start)")
         migrate()
     }
 
