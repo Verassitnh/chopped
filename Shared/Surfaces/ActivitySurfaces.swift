@@ -44,7 +44,7 @@ struct LockActivityView: View {
                         .lineLimit(1)
                         .padding(.leading, LockTitleLayout.titleIndent)
                 }
-                LiveTimerText(start: state.start, now: now)
+                LiveTimerText(start: state.start, countdownTo: state.countdownEnd, now: now)
                     .geistPixel(titled ? LockTitleLayout.timerSize : 68)
                     .foregroundStyle(foreground)
                     .lineLimit(1)
@@ -89,7 +89,7 @@ struct IslandCompactTimer: View {
 
     var body: some View {
         let over = state.isOver(at: now)
-        LiveTimerText(start: state.start, now: now)
+        LiveTimerText(start: state.start, countdownTo: state.countdownEnd, now: now)
             .geistMono(15, .semibold, tracking: -0.02, lineHeight: 19)
             .foregroundStyle(over ? Drained.text : state.color.accent)
             .multilineTextAlignment(.trailing)
@@ -112,7 +112,7 @@ struct IslandExpandedHeader: View {
                     .geist(14, .semibold, lineHeight: 18)
                     .foregroundStyle(CH.textMuted)
                     .lineLimit(1)
-                LiveTimerText(start: state.start, now: now)
+                LiveTimerText(start: state.start, countdownTo: state.countdownEnd, now: now)
                     .geistPixel(44)
                     .foregroundStyle(.white)
                     .lineLimit(1)

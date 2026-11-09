@@ -536,7 +536,6 @@ final class Store {
             sessions.filter { $0.activityID == a.id && $0.end != nil }
                 .reduce(0) { $0 + $1.duration(in: currentPeriod(for: a, now: AppClock.now), now: AppClock.now) }
         }
-        BreakNotice.schedule(end: activeBreak.map(breakEnd), returningTo: activeBreak.flatMap { self.activity($0.activityID)?.name })
         if session == nil, let b = activeBreak {
             LiveActivityController.syncBreak(since: b.start)
             return
