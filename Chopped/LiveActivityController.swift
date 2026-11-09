@@ -9,7 +9,8 @@ enum LiveActivityController {
                 ChoppedActivityAttributes.ContentState(
                     name: activity.name, colorHex: activity.colorHex, start: session.start,
                     icon: activity.icon, periodBase: periodBase, goalMinutes: activity.goalMinutes,
-                    period: activity.period.rawValue, trackerID: activity.id)
+                    period: activity.period.rawValue, trackerID: activity.id,
+                    showsTitle: AppGroup.liveActivityTitles)
             }
         }
         LiveActivityBridge.sync(state)

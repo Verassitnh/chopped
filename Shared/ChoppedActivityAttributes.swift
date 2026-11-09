@@ -16,6 +16,7 @@ struct ChoppedActivityAttributes: ActivityAttributes {
         var period: String? = nil
         /// Running tracker's id (deep links / intents).
         var trackerID: Int64? = nil
+        var showsTitle: Bool? = nil
     }
 }
 

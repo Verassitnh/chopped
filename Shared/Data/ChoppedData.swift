@@ -25,6 +25,9 @@ enum AppGroup {
     static var liveActivitiesEnabled: Bool {
         defaults?.object(forKey: liveActivitiesEnabledKey) as? Bool ?? true
     }
+
+    static let liveActivityTitlesKey = "liveActivityTitles"
+    static var liveActivityTitles: Bool { defaults?.bool(forKey: liveActivityTitlesKey) ?? false }
 }
 
 /// Location of the SQLite database, shared through the App Group.
@@ -167,7 +170,8 @@ struct ChoppedSnapshot: Hashable {
         guard let r = running, let start = r.runningStart else { return nil }
         return ChoppedActivityAttributes.ContentState(
             name: r.name, colorHex: r.colorHex, start: start, icon: r.icon,
-            periodBase: r.periodBase, goalMinutes: r.goalMinutes, period: r.period.rawValue, trackerID: r.id)
+            periodBase: r.periodBase, goalMinutes: r.goalMinutes, period: r.period.rawValue, trackerID: r.id,
+            showsTitle: AppGroup.liveActivityTitles)
     }
 }
 
