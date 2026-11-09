@@ -126,6 +126,7 @@ struct StatsPage: View {
             StatsHero(range: range, rows: rows)
                 .padding(.top, 36)
             section(top: 36) { HoursByTracker(range: range, rows: rows, width: w, now: now) }
+            section(top: 44) { BreaksSection(range: range, width: w, now: now) }
             section(top: 44) { WeekTrend(now: now) }
             if store.activities.contains(where: \.hasGoal) {
                 section(top: 44) { GoalCards(now: now) }

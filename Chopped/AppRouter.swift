@@ -13,6 +13,7 @@ final class AppRouter {
     /// New tracker sheet (05).
     var showingNewTracker = false
     var showingSwitcher = false
+    var showingSettings = false
     /// Stats navigation stack; push a tracker id to show Tracker Stats (04).
     var statsPath: [Int64] = []
     /// `-QCScreen detail`: presented by RootView once its window is on screen. Setting `detailActivityID`

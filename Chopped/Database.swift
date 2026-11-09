@@ -85,6 +85,16 @@ final class Database {
             execute("COMMIT")
             version = 2
         }
+        if version < 3 {
+            execute("BEGIN")
+            let columns = Set(query("PRAGMA table_info(sessions)") { $0.text(1) })
+            if !columns.contains("is_break") {
+                execute("ALTER TABLE sessions ADD COLUMN is_break INTEGER NOT NULL DEFAULT 0")
+            }
+            execute("PRAGMA user_version = 3")
+            execute("COMMIT")
+            version = 3
+        }
     }
 
     static let legacyColorMap: [(String, String)] = [

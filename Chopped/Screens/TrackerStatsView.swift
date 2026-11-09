@@ -49,6 +49,9 @@ struct TrackerStatsPage: View {
                     section(top: 44) { StreakBar(activity: a, width: w, now: now) }
                 }
                 section(top: 44) { SessionNumbers(activity: a, now: now) }
+                if store.breaks.contains(where: { $0.activityID == a.id }) {
+                    section(top: 44) { TrackerBreaks(activity: a, now: now) }
+                }
                 Button { router.openDetail(a.id) } label: {
                     HStack(spacing: 8) {
                         Text("Open tracker").geist(14, .semibold, lineHeight: 18).frame(height: 18).foregroundStyle(StatsColor.rowName)

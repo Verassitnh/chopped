@@ -30,6 +30,7 @@ struct WorkSession: Identifiable, Hashable {
     let activityID: Int64
     var start: Date
     var end: Date?
+    var isBreak = false
 
     var isRunning: Bool { end == nil }
 
@@ -100,6 +101,7 @@ struct DayEntries: Hashable, Identifiable {
     /// Newest first.
     let sessions: [WorkSession]
     let total: TimeInterval
+    var breakTotal: TimeInterval = 0
     var id: Date { day.start }
 }
 
@@ -111,6 +113,13 @@ struct SessionStats: Hashable {
     let bestDay: Date?
 }
 
+struct BreakTotal: Hashable, Identifiable {
+    let activity: Activity
+    let seconds: TimeInterval
+    let count: Int
+    var id: Int64 { activity.id }
+}
+
 @Observable
 final class Store {
     private let db: Database
@@ -119,6 +128,8 @@ final class Store {
     private(set) var activities: [Activity] = []
     /// All sessions, newest first.
     private(set) var sessions: [WorkSession] = []
+    private(set) var breaks: [WorkSession] = []
+    private var breakTimer: Task<Void, Never>?
 
     /// A timer started or stopped (in the app, or by an intent while the app is up). Drives the
     /// start/stop haptic, so it changes exactly once per clock change. Not set by the initial load or
@@ -142,6 +153,13 @@ final class Store {
 
     var activeSession: WorkSession? { sessions.first { $0.end == nil } }
     var activeActivity: Activity? { activeSession.flatMap { activity($0.activityID) } }
+    var activeBreak: WorkSession? { breaks.first { $0.end == nil } }
+
+    func isOnBreak(_ activityID: Int64) -> Bool { activeBreak?.activityID == activityID }
+
+    func breakEnd(_ session: WorkSession) -> Date {
+        session.start.addingTimeInterval(TimeInterval(BreakSettings.minutes * 60))
+    }
 
     func activity(_ id: Int64) -> Activity? { activities.first { $0.id == id } }
 
@@ -167,6 +185,42 @@ final class Store {
     func stop(at date: Date = AppClock.now) {
         db.execute("UPDATE sessions SET end = ? WHERE end IS NULL", [date])
         reload()
+    }
+
+    func takeBreak(_ activity: Activity) {
+        let now = AppClock.now
+        db.transaction {
+            db.execute("UPDATE sessions SET end = ? WHERE end IS NULL", [now])
+            db.execute("INSERT INTO sessions (activity_id, start, is_break) VALUES (?, ?, 1)", [activity.id, now])
+        }
+        reload()
+    }
+
+    func endBreak(resume: Bool) {
+        guard let b = activeBreak else { return }
+        let now = AppClock.now
+        db.transaction {
+            db.execute("UPDATE sessions SET end = ? WHERE id = ?", [now, b.id])
+            if resume {
+                db.execute("INSERT INTO sessions (activity_id, start) VALUES (?, ?)", [b.activityID, now])
+            }
+        }
+        reload()
+    }
+
+    private func settleExpiredBreak(now: Date) {
+        let open = db.query("SELECT id, activity_id, start FROM sessions WHERE end IS NULL AND is_break = 1") {
+            ($0.int(0), $0.int(1), $0.date(2)!)
+        }
+        let length = TimeInterval(BreakSettings.minutes * 60)
+        guard let (id, activityID, start) = open.first, start.addingTimeInterval(length) <= now else { return }
+        let end = start.addingTimeInterval(length)
+        db.transaction {
+            db.execute("UPDATE sessions SET end = ? WHERE id = ?", [end, id])
+            if BreakSettings.autoResume {
+                db.execute("INSERT INTO sessions (activity_id, start) VALUES (?, ?)", [activityID, end])
+            }
+        }
     }
 
     // MARK: Calendar buckets
@@ -281,6 +335,35 @@ final class Store {
         return (total(for: activityID, in: week, now: now), total(for: activityID, in: last, now: now))
     }
 
+    // MARK: Breaks
+
+    func breakTotal(for activityID: Int64? = nil, in interval: DateInterval, now: Date) -> TimeInterval {
+        breaks
+            .filter { activityID == nil || $0.activityID == activityID }
+            .reduce(0) { $0 + $1.duration(in: interval, now: now) }
+    }
+
+    func breakCount(for activityID: Int64? = nil, in interval: DateInterval) -> Int {
+        breaks.filter {
+            (activityID == nil || $0.activityID == activityID) && $0.start < interval.end && ($0.end ?? .distantFuture) > interval.start
+        }.count
+    }
+
+    func breakTotals(in interval: DateInterval, now: Date) -> [BreakTotal] {
+        activities.compactMap { a in
+            let seconds = breakTotal(for: a.id, in: interval, now: now)
+            guard seconds > 0 else { return nil }
+            return BreakTotal(activity: a, seconds: seconds, count: breakCount(for: a.id, in: interval))
+        }
+        .sorted { $0.seconds > $1.seconds }
+    }
+
+    func breaks(for activityID: Int64, in interval: DateInterval) -> [WorkSession] {
+        breaks.filter {
+            $0.activityID == activityID && $0.start < interval.end && ($0.end ?? .distantFuture) > interval.start
+        }
+    }
+
     // MARK: Goals, streaks, heatmap
 
     /// Goal outcome for the last `count` periods of the tracker's own period, oldest first (last = current).
@@ -344,14 +427,16 @@ final class Store {
 
     // MARK: Entries
 
-    /// Sessions grouped per day (newest day first, newest session first) within `interval`.
+    /// Sessions and breaks grouped per day (newest day first, newest entry first) within `interval`.
     func entriesByDay(for activityID: Int64, in interval: DateInterval, now: Date) -> [DayEntries] {
-        let list = sessions(for: activityID, in: interval)  // already newest first
+        let list = (sessions(for: activityID, in: interval) + breaks(for: activityID, in: interval))
+            .sorted { $0.start > $1.start }
         var groups: [Date: [WorkSession]] = [:]
         for s in list { groups[Store.day(containing: s.start).start, default: []].append(s) }
         return groups.keys.sorted(by: >).map { start in
             let day = Store.day(containing: start)
-            return DayEntries(day: day, sessions: groups[start]!, total: total(for: activityID, in: day, now: now))
+            return DayEntries(day: day, sessions: groups[start]!, total: total(for: activityID, in: day, now: now),
+                              breakTotal: breakTotal(for: activityID, in: day, now: now))
         }
     }
 
@@ -407,8 +492,9 @@ final class Store {
 
     // MARK: Session fixes
 
-    func addSession(activityID: Int64, start: Date, end: Date?) {
-        db.execute("INSERT INTO sessions (activity_id, start, end) VALUES (?, ?, ?)", [activityID, start, end])
+    func addSession(activityID: Int64, start: Date, end: Date?, isBreak: Bool = false) {
+        db.execute("INSERT INTO sessions (activity_id, start, end, is_break) VALUES (?, ?, ?, ?)",
+                   [activityID, start, end, isBreak ? 1 : 0])
         reload()
     }
 
@@ -436,14 +522,18 @@ final class Store {
 
     private func reload(silent: Bool = false) {
         let wasRunning = activeSession?.id
+        settleExpiredBreak(now: AppClock.now)
         activities = db.query("SELECT id, name, color, position, icon, goal_minutes, period, completed_at FROM activities ORDER BY position, id") {
             Activity(id: $0.int(0), name: $0.text(1), colorHex: $0.text(2), position: Int($0.int(3)),
                      icon: $0.text(4), goalMinutes: Int($0.int(5)), period: GoalPeriod(rawValue: $0.text(6)) ?? .week,
                      completedAt: $0.date(7))
         }
-        sessions = db.query("SELECT id, activity_id, start, end FROM sessions ORDER BY start DESC") {
-            WorkSession(id: $0.int(0), activityID: $0.int(1), start: $0.date(2)!, end: $0.date(3))
+        let all = db.query("SELECT id, activity_id, start, end, is_break FROM sessions ORDER BY start DESC") {
+            WorkSession(id: $0.int(0), activityID: $0.int(1), start: $0.date(2)!, end: $0.date(3), isBreak: $0.int(4) != 0)
         }
+        sessions = all.filter { !$0.isBreak }
+        breaks = all.filter(\.isBreak)
+        scheduleBreakEnd()
         let isRunning = activeSession?.id
         if loaded, !silent, isRunning != wasRunning {
             clockEvent = ClockEvent(kind: isRunning == nil ? .stop : .start, serial: (clockEvent?.serial ?? 0) + 1)
@@ -451,6 +541,22 @@ final class Store {
         }
         loaded = true
         syncLiveActivity()
+    }
+
+    private func scheduleBreakEnd() {
+        breakTimer?.cancel()
+        breakTimer = nil
+        if liveActivities {
+            BreakNotice.schedule(end: activeBreak.map(breakEnd), tracker: activeBreak.flatMap { activity($0.activityID) },
+                                 resumes: BreakSettings.autoResume)
+        }
+        guard let b = activeBreak, !AppClock.isFrozen else { return }
+        let wait = breakEnd(b).timeIntervalSince(AppClock.now)
+        breakTimer = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(max(0, wait) + 0.05))
+            guard !Task.isCancelled else { return }
+            self?.refresh()
+        }
     }
 
     /// Re-reads the database (changes made by widgets / Control Center / Live Activity intents).

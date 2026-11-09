@@ -113,7 +113,9 @@ struct EntryEditSheet: View {
     private var effectiveEnd: Date { keepRunning ? AppClock.now : end }
 
     var body: some View {
-        EditorChrome(title: session.isRunning ? "Running entry" : "Edit entry", accent: activity.color.accent,
+        EditorChrome(title: session.isBreak ? (session.isRunning ? "On break" : "Edit break")
+                                            : (session.isRunning ? "Running entry" : "Edit entry"),
+                     accent: activity.color.accent,
                      canSave: effectiveEnd >= start, save: save) {
             VStack(alignment: .leading, spacing: 24) {
                 DurationReadout(seconds: max(0, effectiveEnd.timeIntervalSince(start)))
@@ -178,6 +180,7 @@ struct AddEntrySheet: View {
 
     @State private var start: Date
     @State private var end: Date
+    @State private var isBreak = false
 
     init(activity: Activity) {
         self.activity = activity
@@ -188,8 +191,8 @@ struct AddEntrySheet: View {
     }
 
     var body: some View {
-        EditorChrome(title: "Add time", accent: activity.color.accent, canSave: end > start, save: {
-            store.addSession(activityID: activity.id, start: start, end: end)
+        EditorChrome(title: isBreak ? "Add break" : "Add time", accent: activity.color.accent, canSave: end > start, save: {
+            store.addSession(activityID: activity.id, start: start, end: end, isBreak: isBreak)
         }) {
             VStack(alignment: .leading, spacing: 24) {
                 DurationReadout(seconds: max(0, end.timeIntervalSince(start)))
@@ -199,6 +202,9 @@ struct AddEntrySheet: View {
                     }
                     EditorRow(title: "End") {
                         DatePicker("End", selection: $end, in: start...AppClock.now).labelsHidden()
+                    }
+                    EditorRow(title: "Break") {
+                        Toggle("Break", isOn: $isBreak).labelsHidden()
                     }
                 }
             }

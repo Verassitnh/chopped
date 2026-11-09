@@ -34,6 +34,9 @@ struct RootView: View {
         .sheet(isPresented: $router.showingSwitcher) {
             SwitchSheet()
         }
+        .sheet(isPresented: $router.showingSettings) {
+            SettingsSheet()
+        }
         .newTrackerOverlay(isPresented: $router.showingNewTracker)
         .onOpenURL { router.open($0) }
         .task {
