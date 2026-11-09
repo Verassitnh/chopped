@@ -355,7 +355,7 @@ private struct DetailHeader: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
-                HStack(spacing: 10) {
+                HStack(spacing: Self.cardInset) {
                     if running {
                         secondaryButton(glyph: .cup, title: "Break", action: takeBreak)
                     } else if breakSession != nil {
@@ -375,8 +375,8 @@ private struct DetailHeader: View {
                         }
                         .frame(maxWidth: .infinity)
                         .frame(height: 60)
-                        .background(.black, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-                        .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                        .background(.black, in: Self.buttonShape)
+                        .contentShape(Self.buttonShape)
                     }
                     .buttonStyle(.pressScale)
                 }
@@ -384,11 +384,17 @@ private struct DetailHeader: View {
             }
             .padding(.horizontal, 20)
         }
-        .padding(.bottom, 20)
+        .padding(.bottom, Self.cardInset)
         .background(accent,
-                    in: UnevenRoundedRectangle(topLeadingRadius: 28, bottomLeadingRadius: 30,
-                                               bottomTrailingRadius: 30, topTrailingRadius: 28, style: .continuous))
+                    in: UnevenRoundedRectangle(topLeadingRadius: 28, bottomLeadingRadius: Self.cardBottomRadius,
+                                               bottomTrailingRadius: Self.cardBottomRadius, topTrailingRadius: 28,
+                                               style: .continuous))
     }
+
+    private static let buttonRadius: CGFloat = 22
+    private static let buttonShape = RoundedRectangle(cornerRadius: buttonRadius, style: .continuous)
+    private static let cardInset: CGFloat = 20
+    private static let cardBottomRadius = buttonRadius + cardInset
 
     private func secondaryButton(glyph: Glyph?, title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
@@ -400,8 +406,8 @@ private struct DetailHeader: View {
             }
             .padding(.horizontal, 20)
             .frame(height: 60)
-            .background(Color.black.opacity(0.12), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .background(Color.black.opacity(0.12), in: Self.buttonShape)
+            .contentShape(Self.buttonShape)
         }
         .buttonStyle(.pressScale)
     }
