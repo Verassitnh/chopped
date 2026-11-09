@@ -18,29 +18,25 @@ struct HomeView: View {
                 .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
-            if let scheduled = store.scheduledSwitch, store.activeSession == nil {
-                ScheduledSwitchChip(scheduled: scheduled) { toggle { store.cancelScheduledSwitch() } }
-                .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 10, trailing: 12))
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
+            let scheduled = store.scheduledSwitch
+            let running = store.activeActivity
+            let trackers = ordered(scheduled: scheduled, running: running)
+            if let scheduled, running == nil {
+                relayRow(scheduled, from: nil, top: 4)
             }
-            ForEach(Array(store.trackers.enumerated()), id: \.element.id) { index, a in
+            ForEach(Array(trackers.enumerated()), id: \.element.id) { index, a in
+                let isRunning = running?.id == a.id
+                let isNext = scheduled?.to?.id == a.id
                 // The card is a Button (press feedback: 0.98 spring, off with Reduce Motion); its
                 // Play/Stop are separate Buttons inside the label, so they take their own taps.
                 Button { router.openDetail(a.id) } label: {
-                    Ticker(every: store.isRunning(a.id) || store.isOnBreak(a.id) ? 1 : 60) { now in
-                        let scheduled = store.scheduledSwitch
-                        VStack(spacing: 8) {
-                            TrackerCard(activity: a, now: now,
-                                        startsAt: scheduled?.to?.id == a.id ? scheduled?.date : nil,
-                                        start: { toggle { store.clockIn(a) } },
-                                        stop: { toggle { store.stop() } },
-                                        takeBreak: { toggle { store.takeBreak(a) } },
-                                        openSwitcher: { router.showingSwitcher = true })
-                            if let scheduled, store.isRunning(a.id) {
-                                ScheduledSwitchChip(scheduled: scheduled) { toggle { store.cancelScheduledSwitch() } }
-                            }
-                        }
+                    Ticker(every: isRunning || store.isOnBreak(a.id) ? 1 : 60) { now in
+                        TrackerCard(activity: a, now: now,
+                                    scheduledLine: isNext ? scheduledLine(scheduled, running: running) : nil,
+                                    start: { toggle { store.clockIn(a) } },
+                                    stop: { toggle { store.stop() } },
+                                    takeBreak: { toggle { store.takeBreak(a) } },
+                                    openSwitcher: { router.showingSwitcher = true })
                     }
                     .contentShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
                 }
@@ -51,10 +47,14 @@ struct HomeView: View {
                         .tint(Color(hex: "#FF453A"))
                 }
                 // 14pt between cards (7 + 7), 4pt above the first, 24pt below the last.
-                .listRowInsets(EdgeInsets(top: index == 0 ? 4 : 7, leading: 12,
-                                          bottom: index == store.trackers.count - 1 ? 24 : 7, trailing: 12))
+                .listRowInsets(EdgeInsets(top: index == 0 && !(isNext && running == nil) ? 4 : (isNext ? 0 : 7), leading: 12,
+                                          bottom: index == trackers.count - 1 ? 24 : (isRunning && scheduled != nil ? 0 : 7),
+                                          trailing: 12))
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
+                if isRunning, let scheduled {
+                    relayRow(scheduled, from: a, top: 0)
+                }
             }
             if store.trackers.isEmpty {
                 emptyState
@@ -83,6 +83,27 @@ struct HomeView: View {
             if store.isRunning(a.id) { store.stop() }
             store.deleteActivity(a)
         }
+    }
+
+    private func ordered(scheduled: Store.ScheduledSwitch?, running: Activity?) -> [Activity] {
+        var list = store.trackers
+        guard let next = scheduled?.to, let i = list.firstIndex(where: { $0.id == next.id }) else { return list }
+        let moved = list.remove(at: i)
+        let at = running.flatMap { r in list.firstIndex { $0.id == r.id }.map { $0 + 1 } } ?? 0
+        list.insert(moved, at: at)
+        return list
+    }
+
+    private func scheduledLine(_ scheduled: Store.ScheduledSwitch?, running: Activity?) -> String? {
+        guard let scheduled else { return nil }
+        return running == nil ? "Starts at \(Fmt.clock(scheduled.date))" : "Takes over at \(Fmt.clock(scheduled.date))"
+    }
+
+    private func relayRow(_ scheduled: Store.ScheduledSwitch, from: Activity?, top: CGFloat) -> some View {
+        RelayMarker(scheduled: scheduled, from: from) { toggle { store.cancelScheduledSwitch() } }
+            .listRowInsets(EdgeInsets(top: top, leading: 12, bottom: 0, trailing: 12))
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
     }
 
     private func toggle(_ change: () -> Void) {
@@ -138,7 +159,7 @@ struct TrackerCard: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let activity: Activity
     let now: Date
-    var startsAt: Date? = nil
+    var scheduledLine: String? = nil
     var start: () -> Void
     var stop: () -> Void
     var takeBreak: (() -> Void)? = nil
@@ -257,7 +278,8 @@ struct TrackerCard: View {
         let session = store.activeSession
         let elapsed = session.map { now.timeIntervalSince($0.start) } ?? 0
         let total = store.periodTotal(for: a, now: now)
-        let clockedIn = "Clocked in · \(Fmt.time(session?.start ?? now)) · "
+        let clockedIn = session?.end.map { "Clocked in · \(Fmt.clock(session?.start ?? now)) · until \(Fmt.clock($0))" }
+            .map { $0 + (over == nil ? "" : " · ") } ?? "Clocked in · \(Fmt.time(session?.start ?? now)) · "
         return HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 10) {
@@ -280,7 +302,7 @@ struct TrackerCard: View {
                     if let over {
                         Text(clockedIn) + overText(over, palette)
                     } else {
-                        Text(clockedIn + (a.hasGoal ? "\(Fmt.hm(total)) of \(Fmt.goal(minutes: a.goalMinutes))"
+                        Text(session?.end != nil ? clockedIn : clockedIn + (a.hasGoal ? "\(Fmt.hm(total)) of \(Fmt.goal(minutes: a.goalMinutes))"
                                                       : "\(Fmt.hm(total)) \(a.period.current)"))
                     }
                 }
@@ -314,8 +336,8 @@ struct TrackerCard: View {
                 Group {
                     if let over {
                         Text("\(a.period.adjective) · \(Fmt.goal(minutes: a.goalMinutes)) · ") + overText(over, palette)
-                    } else if let startsAt {
-                        Text("Starts \(Fmt.clock(startsAt)) · " + (a.hasGoal ? "\(Fmt.goal(minutes: a.goalMinutes)) goal" : a.goalLine))
+                    } else if let scheduledLine {
+                        Text(scheduledLine)
                     } else {
                         Text(metaLine(a))
                     }
@@ -442,34 +464,47 @@ struct BreakStopControl: View {
     }
 }
 
-struct ScheduledSwitchChip: View {
+struct RelayMarker: View {
     let scheduled: Store.ScheduledSwitch
+    let from: Activity?
     let cancel: () -> Void
 
     var body: some View {
-        HStack(spacing: 8) {
-            Circle()
-                .fill(scheduled.to?.color.accent ?? CH.textSecondary)
-                .frame(width: 8, height: 8)
-            Text(title)
-                .geist(13, .medium, lineHeight: 17)
-                .foregroundStyle(CH.text)
-                .lineLimit(1)
-            Spacer(minLength: 8)
-            Button("Cancel", action: cancel)
-                .geist(13, .medium, lineHeight: 17)
-                .foregroundStyle(CH.textSecondary)
+        HStack(spacing: 10) {
+            line(from?.color.accent ?? CH.pastMid, leading: false)
+            HStack(spacing: 8) {
+                Text(scheduled.to == nil ? "Clock out · \(Fmt.clock(scheduled.date))" : Fmt.clock(scheduled.date))
+                    .geistMono(13, .medium, tracking: -0.02, lineHeight: 16)
+                    .monospacedDigit()
+                    .foregroundStyle(CH.text)
+                Button(action: cancel) {
+                    Circle()
+                        .fill(Color.white.opacity(0.08))
+                        .frame(width: 20, height: 20)
+                        .overlay { GlyphView(.close, size: 8, color: CH.textMuted) }
+                        .frame(width: 32, height: 32)
+                        .contentShape(Rectangle())
+                }
                 .buttonStyle(.pressScale)
+                .padding(.vertical, -6)
                 .accessibilityLabel("Cancel scheduled switch")
+            }
+            .padding(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 8))
+            .background(CH.raised, in: Capsule())
+            .overlay { Capsule().strokeBorder(Color.white.opacity(0.08)) }
+            line(scheduled.to?.color.accent ?? CH.pastMid, leading: true)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(CH.raised, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .padding(.horizontal, 10)
+        .frame(height: 44)
         .accessibilityElement(children: .contain)
+        .accessibilityLabel(scheduled.to.map { "Switches to \($0.name) at \(Fmt.clock(scheduled.date))" }
+                            ?? "Clocks out at \(Fmt.clock(scheduled.date))")
     }
 
-    private var title: String {
-        guard let to = scheduled.to else { return "Clocks out at \(Fmt.clock(scheduled.date))" }
-        return "\(to.name) at \(Fmt.clock(scheduled.date))"
+    private func line(_ color: Color, leading: Bool) -> some View {
+        Capsule()
+            .fill(LinearGradient(colors: leading ? [color, color.opacity(0)] : [color.opacity(0), color],
+                                 startPoint: .leading, endPoint: .trailing))
+            .frame(height: 2)
     }
 }
