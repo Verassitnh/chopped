@@ -46,6 +46,17 @@ enum Fmt {
         return (p < 0 ? "\u{2212}" : "+") + "\(abs(p))%"
     }
 
+    static func clockParts(_ d: Date, calendar: Calendar = .chopped) -> (time: String, meridiem: String) {
+        let c = calendar.dateComponents([.hour, .minute], from: d)
+        let h = c.hour ?? 0
+        return ("\(h % 12 == 0 ? 12 : h % 12):" + String(format: "%02d", c.minute ?? 0), h < 12 ? "AM" : "PM")
+    }
+
+    static func clock(_ d: Date, calendar: Calendar = .chopped) -> String {
+        let p = clockParts(d, calendar: calendar)
+        return "\(p.time) \(p.meridiem)"
+    }
+
     /// "20:06" — 24h clock time.
     static func time(_ d: Date, calendar: Calendar = .chopped) -> String {
         let c = calendar.dateComponents([.hour, .minute], from: d)

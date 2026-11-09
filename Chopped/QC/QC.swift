@@ -39,6 +39,13 @@ enum QC {
     static let over = args.contains("-QCOver")
     static let noGoal = args.contains("-QCNoGoal")
 
+    static let switchOffset = intArg("-QCSwitchOffset")
+
+    private static func intArg(_ name: String) -> Int? {
+        guard let i = args.firstIndex(of: name), i + 1 < args.count else { return nil }
+        return Int(args[i + 1])
+    }
+
     static let crossIn: TimeInterval? = {
         guard let i = args.firstIndex(of: "-QCCrossIn"), i + 1 < args.count else { return nil }
         return TimeInterval(args[i + 1])
@@ -55,6 +62,13 @@ enum QC {
         if let breakMinutesAgo { DemoData.startBreak(store, minutesAgo: breakMinutesAgo) }
         if over { DemoData.putOverGoal(store) }
         if noGoal { DemoData.removeGoals(store) }
+        if let minutes = intArg("-QCScheduleSwitch"), let meetings = store.trackers.first(where: { $0.name == "Meetings" }) {
+            store.clockIn(meetings, at: AppClock.now.addingTimeInterval(TimeInterval(minutes * 60)))
+            if let advance = intArg("-QCAdvance"), let frozen = AppClock.frozen {
+                AppClock.frozen = frozen.addingTimeInterval(TimeInterval(advance * 60))
+                store.refresh(silent: true)
+            }
+        }
         if let crossIn, let crossing = DemoData.crossSoon(store) {
             AppClock.frozen = nil
             AppClock.offset = crossing.addingTimeInterval(-crossIn).timeIntervalSince(Date())

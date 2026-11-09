@@ -8,7 +8,7 @@ enum OverLimitNotice {
     static func schedule(for state: ChoppedActivityAttributes.ContentState?) {
         let center = UNUserNotificationCenter.current()
         center.removePendingNotificationRequests(withIdentifiers: [identifier])
-        guard let state, let overDate = state.overDate, let goal = state.goalMinutes else { return }
+        guard let state = state?.effectiveOverState, let overDate = state.overDate, let goal = state.goalMinutes else { return }
         let wait = overDate.timeIntervalSinceNow
         guard wait > 1 else { return }
         center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
