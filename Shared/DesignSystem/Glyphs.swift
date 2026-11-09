@@ -18,6 +18,8 @@ enum Glyph: String, CaseIterable, Identifiable {
     case arrowRight // entries "→" (24×24)
     case swap
     case play       // filled triangle (16×18, fill)
+    case cup
+    case sliders
 
     var id: String { rawValue }
 
@@ -49,6 +51,9 @@ enum Glyph: String, CaseIterable, Identifiable {
         case .chevronLeft: GlyphSpec([.path("M15 5l-7 7 7 7")])
         case .arrowUp: GlyphSpec([.path("M12 19V5M5 12l7-7 7 7")])
         case .arrowRight: GlyphSpec([.path("M5 12h14M12 5l7 7-7 7")])
+        case .cup: GlyphSpec([.path("M4 10h12v4c0 3.3-2.7 6-6 6s-6-2.7-6-6v-4Z"),
+                              .path("M16 11h1.5c1.4 0 2.5 1.1 2.5 2.5S18.9 16 17.5 16H16"), .path("M8 3.5v3M12 3.5v3")])
+        case .sliders: GlyphSpec([.path("M4 7h9M19 7h1M4 17h1M11 17h9"), .circle(16, 7, 2.5), .circle(8, 17, 2.5)])
         case .swap: GlyphSpec(strokeWidth: 2.2, [.path("M4 8h15M15 4l4 4-4 4M20 16H5M9 12l-4 4 4 4")])
         case .play: GlyphSpec(viewBox: CGSize(width: 16, height: 18), fill: true,
                               [.path("M2 1.8c0-1 1.1-1.6 2-1.1l10.7 6.9c.8.5.8 1.7 0 2.2L4 16.7c-.9.5-2-.1-2-1.1z")])

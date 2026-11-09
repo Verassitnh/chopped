@@ -21,10 +21,12 @@ struct HomeView: View {
                 // The card is a Button (press feedback: 0.98 spring, off with Reduce Motion); its
                 // Play/Stop are separate Buttons inside the label, so they take their own taps.
                 Button { router.openDetail(a.id) } label: {
-                    Ticker(every: store.isRunning(a.id) ? 1 : 60) { now in
+                    Ticker(every: store.isRunning(a.id) || store.isOnBreak(a.id) ? 1 : 60) { now in
                         TrackerCard(activity: a, now: now,
                                     start: { toggle { store.clockIn(a) } },
-                                    stop: { toggle { store.stop() } })
+                                    stop: { toggle { store.stop() } },
+                                    takeBreak: { toggle { store.takeBreak(a) } },
+                                    resume: { toggle { store.endBreak(resume: true) } })
                     }
                     .contentShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
                 }
@@ -91,8 +93,12 @@ struct HomeView: View {
             }
             .frame(height: 46)   // 16 + 4 + 26, pinned so fractional line-height padding can't drift
             Spacer(minLength: 12)
-            GlassCircleButton(glyph: .plus) { router.showingNewTracker = true }
-                .accessibilityLabel("New tracker")
+            HStack(spacing: 10) {
+                GlassCircleButton(glyph: .sliders, glyphSize: 18) { router.showingSettings = true }
+                    .accessibilityLabel("Settings")
+                GlassCircleButton(glyph: .plus) { router.showingNewTracker = true }
+                    .accessibilityLabel("New tracker")
+            }
         }
         .padding(EdgeInsets(top: 20, leading: 20, bottom: 22, trailing: 20))
     }
@@ -128,6 +134,8 @@ struct TrackerCard: View {
     let now: Date
     var start: () -> Void
     var stop: () -> Void
+    var takeBreak: (() -> Void)? = nil
+    var resume: (() -> Void)? = nil
     @State private var drainStart: Date?
 
     var body: some View {
@@ -203,6 +211,8 @@ struct TrackerCard: View {
         Group {
             if store.isRunning(a.id) {
                 runningRow(a, over: over, drained: drained)
+            } else if let b = store.activeBreak, b.activityID == a.id {
+                breakRow(a, session: b, drained: drained)
             } else {
                 idleRow(a, over: over, drained: drained)
             }
@@ -263,7 +273,51 @@ struct TrackerCard: View {
                 .minimumScaleFactor(0.8)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            StopButton(accent: a.color.accent, action: stop)
+            VStack(spacing: 10) {
+                if let takeBreak {
+                    CircleIconButton(glyph: .cup, size: 40, glyphSize: 18,
+                                     background: palette.iconTile, foreground: palette.icon, action: takeBreak)
+                        .accessibilityLabel("Take a break")
+                }
+                StopButton(accent: a.color.accent, action: stop)
+            }
+        }
+        .padding(EdgeInsets(top: 14, leading: 16, bottom: 14, trailing: 14))
+    }
+
+    // MARK: Break
+
+    private func breakRow(_ a: Activity, session: WorkSession, drained: Bool) -> some View {
+        let palette = drained ? Palette.drained : .accent
+        let end = store.breakEnd(session)
+        let left = max(0, end.timeIntervalSince(now))
+        return HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 10) {
+                    IconTile(glyph: .cup, size: 30, radius: 9, glyphSize: 16,
+                             foreground: palette.icon, background: palette.iconTile)
+                    Text(a.name)
+                        .geist(20, .semibold, tracking: -0.015, lineHeight: 24)
+                        .foregroundStyle(palette.text)
+                        .lineLimit(1)
+                }
+                Text(Fmt.hms(left)).monospacedDigit()
+                    .geistPixel(62)
+                    .foregroundStyle(palette.text)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .contentTransition(.numericText(countsDown: true))
+                    .animation(.snappy(duration: 0.25), value: Int(left))
+                    .accessibilityLabel("\(Fmt.words(left)) of break left")
+                Text("On break · \(BreakSettings.autoResume ? "resumes" : "ends") \(Fmt.time(end))")
+                    .geist(13, .medium, lineHeight: 17)
+                    .foregroundStyle(palette.meta)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            PlayButton(size: 52, action: resume ?? start)
+                .accessibilityLabel("End break and resume")
         }
         .padding(EdgeInsets(top: 14, leading: 16, bottom: 14, trailing: 14))
     }

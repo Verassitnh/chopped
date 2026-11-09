@@ -186,7 +186,7 @@ enum ChoppedData {
     @discardableResult
     static func start(_ trackerID: Int64, at date: Date = Date()) -> Bool {
         guard let url = ChoppedDB.existingURL, let db = Connection(url: url, readOnly: false) else { return false }
-        let running = db.query("SELECT activity_id FROM sessions WHERE end IS NULL") { sqlite3_column_int64($0, 0) }
+        let running = db.query("SELECT activity_id FROM sessions WHERE end IS NULL \(db.workOnly)") { sqlite3_column_int64($0, 0) }
         if running == [trackerID] { return true }
         let hasCompleted = !db.query("SELECT 1 FROM pragma_table_info('activities') WHERE name = 'completed_at'") { _ in 1 }.isEmpty
         if hasCompleted, db.query("SELECT 1 FROM activities WHERE id = ? AND completed_at IS NULL", [trackerID]) { _ in 1 }.isEmpty {
@@ -220,6 +220,10 @@ enum ChoppedData {
         }
 
         deinit { sqlite3_close(db) }
+
+        lazy var workOnly: String = {
+            query("SELECT 1 FROM pragma_table_info('sessions') WHERE name = 'is_break'") { _ in 1 }.isEmpty ? "" : "AND is_break = 0"
+        }()
 
         func exec(_ sql: String, _ params: [Any] = []) {
             var stmt: OpaquePointer?
@@ -273,13 +277,13 @@ enum ChoppedData {
             // Earliest period start we need (year covers everything).
             let earliest = calendar.dateInterval(of: .year, for: now)?.start ?? now
             struct S { let activity: Int64; let start: Date; let end: Date? }
-            let sessions = query("SELECT activity_id, start, end FROM sessions WHERE end IS NULL OR end > ? ",
+            let sessions = query("SELECT activity_id, start, end FROM sessions WHERE (end IS NULL OR end > ?) \(workOnly)",
                                  [earliest.timeIntervalSince1970]) {
                 S(activity: sqlite3_column_int64($0, 0),
                   start: Date(timeIntervalSince1970: sqlite3_column_double($0, 1)),
                   end: sqlite3_column_type($0, 2) == SQLITE_NULL ? nil : Date(timeIntervalSince1970: sqlite3_column_double($0, 2)))
             }
-            let lastUsed = Dictionary(query("SELECT activity_id, MAX(start) FROM sessions GROUP BY activity_id") {
+            let lastUsed = Dictionary(query("SELECT activity_id, MAX(start) FROM sessions WHERE 1 \(workOnly) GROUP BY activity_id") {
                 (sqlite3_column_int64($0, 0), Date(timeIntervalSince1970: sqlite3_column_double($0, 1)))
             }, uniquingKeysWith: { a, _ in a })
 

@@ -35,7 +35,7 @@ struct SwitchSheet: View {
                     .accessibilityHint("Switches to \(a.name)")
                 }
             }
-            if store.activeSession != nil {
+            if store.activeSession != nil || store.activeBreak != nil {
                 Button(action: clockOut) {
                     Text("CLOCK OUT FOR THE DAY")
                         .geistMono(13, .medium, tracking: 0.08, lineHeight: 18)
@@ -74,6 +74,7 @@ struct SwitchSheet: View {
     }
 
     private func subtitle(now: Date) -> String {
+        if let b = store.activeBreak, let a = store.activity(b.activityID) { return "On break from \(a.name)" }
         guard let session = store.activeSession, let running = store.activeActivity else { return "Nothing running" }
         return "\(running.name) stops at \(Fmt.hms(now.timeIntervalSince(session.start)))"
     }
