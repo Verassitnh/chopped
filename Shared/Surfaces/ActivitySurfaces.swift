@@ -4,9 +4,10 @@ typealias ClockInState = ChoppedActivityAttributes.ContentState
 
 // MARK: - 06 Lock screen Live Activity (Paper B7A-0)
 
-/// Tinted bezel (uniform 5pt, r26) around the bright accent block: Pixel 68 timer + 52pt swap button
-/// that opens the app's Switch sheet.
-/// No name, no strip. The bezel tint is also set as `activityBackgroundTint` by the widget.
+/// Tinted 5pt bezel around the bright accent block: Pixel 68 timer + 52pt swap button that opens the
+/// app's Switch sheet. The bezel is `activityBackgroundTint`; the block is concentric with the system's
+/// container, and the timer's height is pinned so the card keeps its size when the timer's glyphs
+/// change (e.g. placeholder dashes while the device sleeps).
 struct LockActivityView: View {
     let state: ClockInState
     var now: Date = AppClock.now
@@ -16,24 +17,21 @@ struct LockActivityView: View {
     var body: some View {
         let color = state.color
         let over = state.isOver(at: now)
-        TrackerBezel(tint: over ? Drained.bezel : color.tint, accent: .clear,
-                     padding: EdgeInsets(5), spacing: 0) {
-            ZStack {
-                if over {
-                    row(drained: true, over: over)
-                        .background(Drained.inner)
-                        .transition(.opacity)
-                } else {
-                    row(drained: false, over: over)
-                        .background(color.accent)
-                        .transition(.opacity)
-                }
+        ZStack {
+            if over {
+                row(drained: true, over: over)
+                    .background(Drained.inner)
+                    .transition(.opacity)
+            } else {
+                row(drained: false, over: over)
+                    .background(color.accent)
+                    .transition(.opacity)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 21, style: .continuous))
-            .animation(.easeInOut(duration: 0.8), value: over)
-        } footer: {
-            EmptyView()
         }
+        .clipShape(ContainerRelativeShape())
+        .animation(.easeInOut(duration: 0.8), value: over)
+        .padding(5)
+        .background(over ? Drained.bezel : color.tint)
     }
 
     private func row(drained: Bool, over: Bool) -> some View {
@@ -44,7 +42,7 @@ struct LockActivityView: View {
                 .foregroundStyle(drained ? Drained.text : CH.onAccent)
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxWidth: .infinity, minHeight: 68, maxHeight: 68, alignment: .leading)
             SwitchLink {
                 SurfaceSwapGlyph(size: 52, foreground: state.color.accent)
             }
