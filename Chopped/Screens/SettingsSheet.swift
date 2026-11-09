@@ -3,8 +3,7 @@ import SwiftUI
 struct SettingsSheet: View {
     @Environment(Store.self) private var store
     @Environment(\.dismiss) private var dismiss
-    @AppStorage(BreakSettings.minutesKey) private var breakMinutes = BreakSettings.defaultMinutes
-    @AppStorage(BreakSettings.autoResumeKey) private var autoResume = true
+    @AppStorage(BreakSettings.minutesKey, store: BreakSettings.defaults) private var breakMinutes = BreakSettings.minutes
     @AppStorage(AppGroup.liveActivityTitlesKey, store: AppGroup.defaults) private var liveActivityTitles = false
 
     var body: some View {
@@ -39,20 +38,12 @@ struct SettingsSheet: View {
                 .padding(.top, 28)
                 .padding(.bottom, 10)
 
-            VStack(spacing: 0) {
-                row("Default break") { lengthStepper }
-                CH.pastMid.opacity(0.5).frame(height: 1)
-                row("Resume tracker after") {
-                    Toggle("Resume tracker after", isOn: $autoResume).labelsHidden()
-                }
-            }
+            row("Default break") { lengthStepper }
             .padding(.horizontal, 16)
             .background(CH.raised, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
             .padding(.horizontal, 20)
 
-            Text(autoResume
-                 ? "Breaks end after \(Fmt.goal(minutes: breakMinutes)) and the tracker picks up where it left off. Break time is logged per tracker and doesn't count toward goals."
-                 : "Breaks end after \(Fmt.goal(minutes: breakMinutes)) and the tracker stays stopped. Break time is logged per tracker and doesn't count toward goals.")
+            Text("You'll get a notification after \(Fmt.goal(minutes: breakMinutes)). The break keeps counting until you switch back. Break time is logged per tracker and doesn't count toward goals.")
                 .geist(13, .medium, lineHeight: 18)
                 .foregroundStyle(CH.textSecondary)
                 .padding(.horizontal, 24)
@@ -66,7 +57,6 @@ struct SettingsSheet: View {
         .presentationCornerRadius(30)
         .tint(CH.up)
         .onChange(of: breakMinutes) { store.refresh(silent: true) }
-        .onChange(of: autoResume) { store.refresh(silent: true) }
         .onChange(of: liveActivityTitles) { store.syncLiveActivity() }
     }
 

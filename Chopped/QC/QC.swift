@@ -44,9 +44,15 @@ enum QC {
         return TimeInterval(args[i + 1])
     }()
 
+    static let breakMinutesAgo: Double? = {
+        guard let i = args.firstIndex(of: "-QCBreak"), i + 1 < args.count else { return nil }
+        return Double(args[i + 1])
+    }()
+
     static func makeStore() -> Store {
         guard demo else { return Store() }
         let store = DemoData.makeStore()
+        if let breakMinutesAgo { DemoData.startBreak(store, minutesAgo: breakMinutesAgo) }
         if over { DemoData.putOverGoal(store) }
         if noGoal { DemoData.removeGoals(store) }
         if let crossIn, let crossing = DemoData.crossSoon(store) {

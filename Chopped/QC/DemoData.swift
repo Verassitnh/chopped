@@ -29,6 +29,13 @@ enum DemoData {
         }
     }
 
+    static func startBreak(_ store: Store, minutesAgo: Double) {
+        guard let a = store.activeActivity else { return }
+        let start = now.addingTimeInterval(-minutesAgo * 60)
+        store.stop(at: start)
+        store.addSession(activityID: a.id, start: start, end: nil, isBreak: true)
+    }
+
     static func removeGoals(_ store: Store) {
         for name in ["Deep Work", "Email"] {
             guard var a = store.activities.first(where: { $0.name == name }) else { continue }

@@ -54,7 +54,8 @@ struct TrackerDetailView: View {
             VStack(spacing: 0) {
                 DetailHeader(activity: a, now: now, close: { dismiss() }, toggle: { toggle(a) },
                              takeBreak: { animate { store.takeBreak(a) } },
-                             endBreak: { resume in animate { store.endBreak(resume: resume) } })
+                             endBreak: { animate { store.endBreak(resume: false) } },
+                             openSwitcher: { router.open(ChoppedLink.switcher) })
                 weekBars(a, now: now)
                     .padding(.horizontal, 20)
                     .padding(.top, 32)
@@ -213,19 +214,19 @@ struct TrackerDetailView: View {
             .foregroundStyle(Color(hex: s.isBreak ? "#6C6C70" : "#C8C8C8"))
             if s.isBreak {
                 HStack(spacing: 5) {
-                    GlyphView(.cup, size: 12, color: CH.textSecondary)
+                    GlyphView(.cup, size: 12, color: TrackerColor.breakGreen.accent)
                     Text("Break").geist(12, .semibold, lineHeight: 16)
                 }
-                .foregroundStyle(CH.textSecondary)
+                .foregroundStyle(TrackerColor.breakGreen.accent)
                 .padding(.horizontal, 8)
                 .frame(height: 22)
-                .background(CH.raised, in: Capsule())
+                .background(TrackerColor.breakGreen.accent.opacity(0.14), in: Capsule())
                 .padding(.leading, 8)
             }
             Spacer()
             HStack(spacing: 8) {
                 if s.isRunning {
-                    Circle().fill(accent).frame(width: 7, height: 7)
+                    Circle().fill(s.isBreak ? TrackerColor.breakGreen.accent : accent).frame(width: 7, height: 7)
                 }
                 Text(Fmt.hm(s.duration(now: now)))
                     .geistMono(17, .medium, tracking: -0.03, lineHeight: 22)
@@ -261,7 +262,8 @@ private struct DetailHeader: View {
     var close: () -> Void
     var toggle: () -> Void
     var takeBreak: () -> Void
-    var endBreak: (_ resume: Bool) -> Void
+    var endBreak: () -> Void
+    var openSwitcher: () -> Void
 
     var body: some View {
         let a = activity
@@ -271,7 +273,9 @@ private struct DetailHeader: View {
         let breakEnd = breakSession.map { store.breakEnd($0) }
         let total = store.periodTotal(for: a, now: now)
         let elapsed = session.map { now.timeIntervalSince($0.start) } ?? 0
-        let timer = breakEnd.map { max(0, $0.timeIntervalSince(now)) } ?? (running ? elapsed : total)
+        let breakOver = breakEnd.map { now >= $0 } ?? false
+        let timer = breakEnd.map { abs($0.timeIntervalSince(now)) } ?? (running ? elapsed : total)
+        let accent = breakSession != nil ? TrackerColor.breakGreen.accent : a.color.accent
 
         VStack(spacing: 0) {
             Capsule().fill(Color.black.opacity(0.25)).frame(width: 40, height: 5)
@@ -307,13 +311,13 @@ private struct DetailHeader: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                    Text(Fmt.hms(timer)).monospacedDigit()
+                    Text((breakOver ? "+" : "") + Fmt.hms(timer)).monospacedDigit()
                         .geistPixel(92, lineHeight: 90)
                         .foregroundStyle(CH.onAccent)
                         .lineLimit(1)
                         .minimumScaleFactor(0.5)
                         .frame(maxWidth: .infinity)
-                        .contentTransition(.numericText(countsDown: breakEnd != nil))
+                        .contentTransition(.numericText(countsDown: breakEnd != nil && !breakOver))
                         .animation(.snappy(duration: 0.25), value: Int(timer))
                 }
 
@@ -354,17 +358,19 @@ private struct DetailHeader: View {
                     if running {
                         secondaryButton(glyph: .cup, title: "Break", action: takeBreak)
                     } else if breakSession != nil {
-                        secondaryButton(glyph: nil, title: "End break") { endBreak(false) }
+                        secondaryButton(glyph: nil, title: "End break", action: endBreak)
                     }
-                    Button(action: breakSession != nil ? { endBreak(true) } : toggle) {
+                    Button(action: breakSession != nil ? openSwitcher : toggle) {
                         HStack(spacing: 10) {
                             if running {
-                                RoundedRectangle(cornerRadius: 4, style: .continuous).fill(a.color.accent)
+                                RoundedRectangle(cornerRadius: 4, style: .continuous).fill(accent)
                                     .frame(width: 16, height: 16)
+                            } else if breakSession != nil {
+                                GlyphView(.swap, size: 18, color: accent)
                             } else {
-                                GlyphView(.play, size: 14, color: a.color.accent)
+                                GlyphView(.play, size: 14, color: accent)
                             }
-                            Text(running ? "Stop" : breakSession != nil ? "Resume" : "Start")
+                            Text(running ? "Stop" : breakSession != nil ? "Switch" : "Start")
                                 .geist(17, .semibold, lineHeight: 21)
                                 .foregroundStyle(.white)
                                 .contentTransition(.interpolate)
@@ -381,7 +387,7 @@ private struct DetailHeader: View {
             .padding(.horizontal, 20)
         }
         .padding(.bottom, 20)
-        .background(a.color.accent,
+        .background(accent,
                     in: UnevenRoundedRectangle(topLeadingRadius: 28, bottomLeadingRadius: 30,
                                                bottomTrailingRadius: 30, topTrailingRadius: 28, style: .continuous))
     }
@@ -404,7 +410,9 @@ private struct DetailHeader: View {
 
     private func statusLine(running: Bool, session: WorkSession?, breakEnd: Date?) -> String {
         if running { return "Clocked in · \(Fmt.time(session?.start ?? now))" }
-        if let breakEnd { return "On break · \(BreakSettings.autoResume ? "resumes" : "ends") \(Fmt.time(breakEnd))" }
+        if let breakEnd {
+            return now >= breakEnd ? "Break over · since \(Fmt.time(breakEnd))" : "On break · ends \(Fmt.time(breakEnd))"
+        }
         return activity.period == .day ? "Today so far" : "This \(activity.period.rawValue) so far"
     }
 
