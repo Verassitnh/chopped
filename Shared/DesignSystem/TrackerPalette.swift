@@ -22,6 +22,8 @@ struct TrackerColor: Identifiable, Hashable {
     static let green = TrackerColor(key: "green", accentHex: "#7CCB8E", tintHex: TrackerColor.derivedTint("#7CCB8E"))
     static let yellow = TrackerColor(key: "yellow", accentHex: "#E9C95A", tintHex: TrackerColor.derivedTint("#E9C95A"))
 
+    static let breakGreen = TrackerColor(key: "break", accentHex: "#A3E35B", tintHex: TrackerColor.derivedTint("#A3E35B"))
+
     /// Colour-picker order from the New Tracker sheet (N2).
     static let picker: [TrackerColor] = [.blue, .teal, .green, .yellow, .orange, .red, .pink, .purple]
 

@@ -26,7 +26,7 @@ struct HomeView: View {
                                     start: { toggle { store.clockIn(a) } },
                                     stop: { toggle { store.stop() } },
                                     takeBreak: { toggle { store.takeBreak(a) } },
-                                    resume: { toggle { store.endBreak(resume: true) } })
+                                    openSwitcher: { router.showingSwitcher = true })
                     }
                     .contentShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
                 }
@@ -135,20 +135,18 @@ struct TrackerCard: View {
     var start: () -> Void
     var stop: () -> Void
     var takeBreak: (() -> Void)? = nil
-    var resume: (() -> Void)? = nil
+    var openSwitcher: (() -> Void)? = nil
+    var showsBreak = true
     @State private var drainStart: Date?
 
     var body: some View {
         let a = activity
         let over = store.overBy(for: a, now: now)
         Group {
-            if let over, let drainStart {
-                TimelineView(.animation) { context in
-                    let elapsed = context.date.timeIntervalSince(drainStart)
-                    card(a, over: over, frame: DrainFrame(elapsed: elapsed, reduceMotion: reduceMotion))
-                }
+            if showsBreak, let b = store.activeBreak, b.activityID == a.id {
+                BreakCard(activity: a, session: b, now: now, openSwitcher: openSwitcher ?? start)
             } else {
-                card(a, over: over, frame: over == nil ? nil : .settled)
+                trackerCard(a, over: over)
             }
         }
         .animation(nil, value: now)
@@ -162,6 +160,20 @@ struct TrackerCard: View {
             let overflow = Drained.overflowTicks(progress: store.progress(for: a, now: now))
             try? await Task.sleep(for: .seconds(DrainFrame.duration(overflow: overflow, reduceMotion: reduceMotion)))
             drainStart = nil
+        }
+    }
+
+    @ViewBuilder
+    private func trackerCard(_ a: Activity, over: TimeInterval?) -> some View {
+        Group {
+            if let over, let drainStart {
+                TimelineView(.animation) { context in
+                    let elapsed = context.date.timeIntervalSince(drainStart)
+                    card(a, over: over, frame: DrainFrame(elapsed: elapsed, reduceMotion: reduceMotion))
+                }
+            } else {
+                card(a, over: over, frame: over == nil ? nil : .settled)
+            }
         }
     }
 
@@ -211,8 +223,6 @@ struct TrackerCard: View {
         Group {
             if store.isRunning(a.id) {
                 runningRow(a, over: over, drained: drained)
-            } else if let b = store.activeBreak, b.activityID == a.id {
-                breakRow(a, session: b, drained: drained)
             } else {
                 idleRow(a, over: over, drained: drained)
             }
@@ -273,51 +283,11 @@ struct TrackerCard: View {
                 .minimumScaleFactor(0.8)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            VStack(spacing: 10) {
-                if let takeBreak {
-                    CircleIconButton(glyph: .cup, size: 40, glyphSize: 18,
-                                     background: palette.iconTile, foreground: palette.icon, action: takeBreak)
-                        .accessibilityLabel("Take a break")
-                }
+            if let takeBreak {
+                BreakStopControl(accent: a.color.accent, takeBreak: takeBreak, stop: stop)
+            } else {
                 StopButton(accent: a.color.accent, action: stop)
             }
-        }
-        .padding(EdgeInsets(top: 14, leading: 16, bottom: 14, trailing: 14))
-    }
-
-    // MARK: Break
-
-    private func breakRow(_ a: Activity, session: WorkSession, drained: Bool) -> some View {
-        let palette = drained ? Palette.drained : .accent
-        let end = store.breakEnd(session)
-        let left = max(0, end.timeIntervalSince(now))
-        return HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 10) {
-                    IconTile(glyph: .cup, size: 30, radius: 9, glyphSize: 16,
-                             foreground: palette.icon, background: palette.iconTile)
-                    Text(a.name)
-                        .geist(20, .semibold, tracking: -0.015, lineHeight: 24)
-                        .foregroundStyle(palette.text)
-                        .lineLimit(1)
-                }
-                Text(Fmt.hms(left)).monospacedDigit()
-                    .geistPixel(62)
-                    .foregroundStyle(palette.text)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-                    .contentTransition(.numericText(countsDown: true))
-                    .animation(.snappy(duration: 0.25), value: Int(left))
-                    .accessibilityLabel("\(Fmt.words(left)) of break left")
-                Text("On break · \(BreakSettings.autoResume ? "resumes" : "ends") \(Fmt.time(end))")
-                    .geist(13, .medium, lineHeight: 17)
-                    .foregroundStyle(palette.meta)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            PlayButton(size: 52, action: resume ?? start)
-                .accessibilityLabel("End break and resume")
         }
         .padding(EdgeInsets(top: 14, leading: 16, bottom: 14, trailing: 14))
     }
@@ -372,5 +342,84 @@ struct TrackerCard: View {
         case .day, .week: 5
         case .month, .year: 2
         }
+    }
+}
+
+struct BreakCard: View {
+    @Environment(Store.self) private var store
+    let activity: Activity
+    let session: WorkSession
+    let now: Date
+    var openSwitcher: () -> Void
+
+    var body: some View {
+        let green = TrackerColor.breakGreen
+        let end = store.breakEnd(session)
+        let over = now >= end
+        let length = max(1, end.timeIntervalSince(session.start))
+        let shown = over ? now.timeIntervalSince(end) : end.timeIntervalSince(now)
+        TrackerBezel(color: green) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 10) {
+                        IconTile(glyph: .cup, size: 30, radius: 9, glyphSize: 16)
+                        Text("Break")
+                            .geist(20, .semibold, tracking: -0.015, lineHeight: 24)
+                            .foregroundStyle(CH.onAccent)
+                    }
+                    Text((over ? "+" : "") + Fmt.hms(shown)).monospacedDigit()
+                        .geistPixel(62)
+                        .foregroundStyle(CH.onAccent)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                        .contentTransition(.numericText(countsDown: !over))
+                        .animation(.snappy(duration: 0.25), value: Int(shown))
+                        .accessibilityLabel(over ? "Break over by \(Fmt.words(shown))" : "\(Fmt.words(shown)) of break left")
+                    Text(over ? "Over · switch back to \(activity.name)" : "From \(activity.name) · ends \(Fmt.time(end))")
+                        .geist(13, .medium, lineHeight: 17)
+                        .foregroundStyle(CH.onAccentSecondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Button(action: openSwitcher) {
+                    SurfaceSwapGlyph(size: 52, foreground: green.accent)
+                }
+                .buttonStyle(.pressScale)
+                .accessibilityLabel("Switch tracker")
+            }
+            .padding(EdgeInsets(top: 14, leading: 16, bottom: 14, trailing: 14))
+        } footer: {
+            SegmentStrip(fraction: over ? 1 : now.timeIntervalSince(session.start) / length, accent: green.accent)
+        }
+    }
+}
+
+struct BreakStopControl: View {
+    let accent: Color
+    var takeBreak: () -> Void
+    var stop: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Button(action: takeBreak) {
+                GlyphView(.cup, size: 22, color: accent, strokeWidth: 2.5)
+                    .frame(width: 52, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.pressScale)
+            .accessibilityLabel("Take a break")
+            Color.white.opacity(0.14).frame(width: 22, height: 1)
+            Button(action: stop) {
+                RoundedRectangle(cornerRadius: 4, style: .continuous).fill(accent)
+                    .frame(width: 16, height: 16)
+                    .frame(width: 52, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.pressScale)
+            .accessibilityLabel("Stop")
+        }
+        .padding(.vertical, 6)
+        .background(.black, in: Capsule())
     }
 }

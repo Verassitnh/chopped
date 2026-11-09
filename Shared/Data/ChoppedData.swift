@@ -157,6 +157,7 @@ struct ChoppedSnapshot: Hashable {
     var date: Date
     /// Ordered by position.
     var trackers: [TrackerSnapshot]
+    var breakStart: Date? = nil
 
     var running: TrackerSnapshot? { trackers.first(where: \.isRunning) }
     func tracker(_ id: Int64?) -> TrackerSnapshot? { id.flatMap { id in trackers.first { $0.id == id } } }
@@ -167,6 +168,7 @@ struct ChoppedSnapshot: Hashable {
 
     /// Live Activity state for the running tracker (nil when idle).
     var activityState: ChoppedActivityAttributes.ContentState? {
+        if running == nil, let breakStart { return .onBreak(since: breakStart) }
         guard let r = running, let start = r.runningStart else { return nil }
         return ChoppedActivityAttributes.ContentState(
             name: r.name, colorHex: r.colorHex, start: start, icon: r.icon,
@@ -200,6 +202,7 @@ enum ChoppedData {
         db.exec("UPDATE sessions SET end = ? WHERE end IS NULL", [date.timeIntervalSince1970])
         db.exec("INSERT INTO sessions (activity_id, start) VALUES (?, ?)", [trackerID, date.timeIntervalSince1970])
         db.exec("COMMIT")
+        BreakNotice.cancel()
         return true
     }
 
@@ -208,6 +211,7 @@ enum ChoppedData {
     static func stop(at date: Date = Date()) -> Bool {
         guard let url = ChoppedDB.existingURL, let db = Connection(url: url, readOnly: false) else { return false }
         db.exec("UPDATE sessions SET end = ? WHERE end IS NULL", [date.timeIntervalSince1970])
+        BreakNotice.cancel()
         return true
     }
 
@@ -305,7 +309,13 @@ enum ChoppedData {
                                        period: period, position: r.position, periodInterval: interval,
                                        periodLogged: logged, runningStart: running, lastUsed: lastUsed[r.id])
             }
-            return ChoppedSnapshot(date: now, trackers: trackers)
+            var snapshot = ChoppedSnapshot(date: now, trackers: trackers)
+            if !workOnly.isEmpty {
+                snapshot.breakStart = query("SELECT start FROM sessions WHERE end IS NULL AND is_break = 1") {
+                    Date(timeIntervalSince1970: sqlite3_column_double($0, 0))
+                }.first
+            }
+            return snapshot
         }
     }
 }

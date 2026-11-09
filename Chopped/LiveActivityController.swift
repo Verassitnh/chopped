@@ -16,4 +16,9 @@ enum LiveActivityController {
         LiveActivityBridge.sync(state)
         ChoppedSync.reloadSurfaces()
     }
+
+    static func syncBreak(since start: Date) {
+        LiveActivityBridge.sync(.onBreak(since: start))
+        ChoppedSync.reloadSurfaces()
+    }
 }

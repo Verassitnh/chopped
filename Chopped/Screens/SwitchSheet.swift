@@ -25,14 +25,14 @@ struct SwitchSheet: View {
         VStack(spacing: 18) {
             Capsule().fill(CH.pastMid).frame(width: 40, height: 5)
             header(now: now)
-            VStack(spacing: 10) {
-                ForEach(choices) { a in
-                    Button { switchTo(a) } label: {
-                        TrackerCard(activity: a, now: now, start: { switchTo(a) }, stop: {})
-                            .contentShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
-                    }
-                    .buttonStyle(PressScaleStyle(scale: 0.98))
-                    .accessibilityHint("Switches to \(a.name)")
+            if let previous {
+                section("Back to") { card(previous, now: now) }
+                section("Or switch to") {
+                    ForEach(choices.filter { $0.id != previous.id }) { card($0, now: now) }
+                }
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(choices) { card($0, now: now) }
                 }
             }
             if store.activeSession != nil || store.activeBreak != nil {
@@ -48,6 +48,24 @@ struct SwitchSheet: View {
             }
         }
         .padding(EdgeInsets(top: 8, leading: 12, bottom: 40, trailing: 12))
+    }
+
+    private var previous: Activity? { store.activeBreak.flatMap { store.activity($0.activityID) } }
+
+    private func section<C: View>(_ title: String, @ViewBuilder _ content: () -> C) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionLabelText(title).padding(.horizontal, 8)
+            content()
+        }
+    }
+
+    private func card(_ a: Activity, now: Date) -> some View {
+        Button { switchTo(a) } label: {
+            TrackerCard(activity: a, now: now, start: { switchTo(a) }, stop: {}, showsBreak: false)
+                .contentShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+        }
+        .buttonStyle(PressScaleStyle(scale: 0.98))
+        .accessibilityHint("Switches to \(a.name)")
     }
 
     private func header(now: Date) -> some View {
@@ -74,7 +92,10 @@ struct SwitchSheet: View {
     }
 
     private func subtitle(now: Date) -> String {
-        if let b = store.activeBreak, let a = store.activity(b.activityID) { return "On break from \(a.name)" }
+        if let b = store.activeBreak {
+            let end = store.breakEnd(b)
+            return now >= end ? "Break over by \(Fmt.hms(now.timeIntervalSince(end)))" : "Break ends in \(Fmt.hms(end.timeIntervalSince(now)))"
+        }
         guard let session = store.activeSession, let running = store.activeActivity else { return "Nothing running" }
         return "\(running.name) stops at \(Fmt.hms(now.timeIntervalSince(session.start)))"
     }
