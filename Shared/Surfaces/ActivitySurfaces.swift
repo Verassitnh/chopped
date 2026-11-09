@@ -11,8 +11,6 @@ typealias ClockInState = ChoppedActivityAttributes.ContentState
 struct LockActivityView: View {
     let state: ClockInState
     var now: Date = AppClock.now
-    /// The activity's staleDate (start + 1h) passed → the timer has gained an hour field.
-    var isStale = false
 
     var body: some View {
         let color = state.color
@@ -46,8 +44,7 @@ struct LockActivityView: View {
                         .lineLimit(1)
                         .padding(.leading, LockTitleLayout.titleIndent)
                 }
-                LiveTimerText(start: state.start, style: over ? .selfUpdating : .hms, now: now,
-                              pastHour: isStale && !over)
+                LiveTimerText(start: state.start, now: now)
                     .geistPixel(titled ? LockTitleLayout.timerSize : 68)
                     .foregroundStyle(foreground)
                     .lineLimit(1)
@@ -87,12 +84,12 @@ struct IslandCompactTimer: View {
     /// Live timer text reserves a fixed width, so size it to "50:01" (5 cells) or "1:50:01" (7 cells):
     /// Geist Mono advance 0.6em − 0.02em tracking at 15pt = 8.7pt per cell.
     var width: CGFloat {
-        (isStale || state.isOver(at: now) || now.timeIntervalSince(state.start) >= 3600) ? 68 : 50
+        (isStale || now.timeIntervalSince(state.start) >= 3600) ? 68 : 50
     }
 
     var body: some View {
         let over = state.isOver(at: now)
-        LiveTimerText(start: state.start, style: over ? .selfUpdating : .compact, now: now, pastHour: isStale && !over)
+        LiveTimerText(start: state.start, now: now)
             .geistMono(15, .semibold, tracking: -0.02, lineHeight: 19)
             .foregroundStyle(over ? Drained.text : state.color.accent)
             .multilineTextAlignment(.trailing)
@@ -105,8 +102,6 @@ struct IslandCompactTimer: View {
 struct IslandExpandedHeader: View {
     let state: ClockInState
     var now: Date = AppClock.now
-    /// The activity's staleDate (start + 1h) passed → the timer has gained an hour field.
-    var isStale = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -117,8 +112,7 @@ struct IslandExpandedHeader: View {
                     .geist(14, .semibold, lineHeight: 18)
                     .foregroundStyle(CH.textMuted)
                     .lineLimit(1)
-                let over = state.isOver(at: now)
-                LiveTimerText(start: state.start, style: over ? .selfUpdating : .hms, now: now, pastHour: isStale && !over)
+                LiveTimerText(start: state.start, now: now)
                     .geistPixel(44)
                     .foregroundStyle(.white)
                     .lineLimit(1)

@@ -14,10 +14,10 @@ enum Fmt {
         return String(format: "%02d:%02d:%02d", s / 3600, s / 60 % 60, s % 60)
     }
 
-    /// "50:01" under an hour, "1:50:01" over — Dynamic Island compact / widgets.
-    static func compact(_ t: TimeInterval) -> String {
+    /// "0:01", "50:01", "1:00:46" — the system count-up timer format (Live Activities, widgets).
+    static func timer(_ t: TimeInterval) -> String {
         let s = Int(max(0, t))
-        return s < 3600 ? String(format: "%02d:%02d", s / 60, s % 60)
+        return s < 3600 ? String(format: "%d:%02d", s / 60, s % 60)
                         : String(format: "%d:%02d:%02d", s / 3600, s / 60 % 60, s % 60)
     }
 
