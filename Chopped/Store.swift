@@ -129,7 +129,6 @@ final class Store {
     /// All sessions, newest first.
     private(set) var sessions: [WorkSession] = []
     private(set) var breaks: [WorkSession] = []
-    private var breakTimer: Task<Void, Never>?
 
     /// A timer started or stopped (in the app, or by an intent while the app is up). Drives the
     /// start/stop haptic, so it changes exactly once per clock change. Not set by the initial load or
@@ -157,9 +156,7 @@ final class Store {
 
     func isOnBreak(_ activityID: Int64) -> Bool { activeBreak?.activityID == activityID }
 
-    func breakEnd(_ session: WorkSession) -> Date {
-        session.start.addingTimeInterval(TimeInterval(BreakSettings.minutes * 60))
-    }
+    func breakEnd(_ session: WorkSession) -> Date { BreakSettings.end(startingAt: session.start) }
 
     func activity(_ id: Int64) -> Activity? { activities.first { $0.id == id } }
 
@@ -206,21 +203,6 @@ final class Store {
             }
         }
         reload()
-    }
-
-    private func settleExpiredBreak(now: Date) {
-        let open = db.query("SELECT id, activity_id, start FROM sessions WHERE end IS NULL AND is_break = 1") {
-            ($0.int(0), $0.int(1), $0.date(2)!)
-        }
-        let length = TimeInterval(BreakSettings.minutes * 60)
-        guard let (id, activityID, start) = open.first, start.addingTimeInterval(length) <= now else { return }
-        let end = start.addingTimeInterval(length)
-        db.transaction {
-            db.execute("UPDATE sessions SET end = ? WHERE id = ?", [end, id])
-            if BreakSettings.autoResume {
-                db.execute("INSERT INTO sessions (activity_id, start) VALUES (?, ?)", [activityID, end])
-            }
-        }
     }
 
     // MARK: Calendar buckets
@@ -522,7 +504,6 @@ final class Store {
 
     private func reload(silent: Bool = false) {
         let wasRunning = activeSession?.id
-        settleExpiredBreak(now: AppClock.now)
         activities = db.query("SELECT id, name, color, position, icon, goal_minutes, period, completed_at FROM activities ORDER BY position, id") {
             Activity(id: $0.int(0), name: $0.text(1), colorHex: $0.text(2), position: Int($0.int(3)),
                      icon: $0.text(4), goalMinutes: Int($0.int(5)), period: GoalPeriod(rawValue: $0.text(6)) ?? .week,
@@ -533,7 +514,6 @@ final class Store {
         }
         sessions = all.filter { !$0.isBreak }
         breaks = all.filter(\.isBreak)
-        scheduleBreakEnd()
         let isRunning = activeSession?.id
         if loaded, !silent, isRunning != wasRunning {
             clockEvent = ClockEvent(kind: isRunning == nil ? .stop : .start, serial: (clockEvent?.serial ?? 0) + 1)
@@ -541,22 +521,6 @@ final class Store {
         }
         loaded = true
         syncLiveActivity()
-    }
-
-    private func scheduleBreakEnd() {
-        breakTimer?.cancel()
-        breakTimer = nil
-        if liveActivities {
-            BreakNotice.schedule(end: activeBreak.map(breakEnd), tracker: activeBreak.flatMap { activity($0.activityID) },
-                                 resumes: BreakSettings.autoResume)
-        }
-        guard let b = activeBreak, !AppClock.isFrozen else { return }
-        let wait = breakEnd(b).timeIntervalSince(AppClock.now)
-        breakTimer = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(max(0, wait) + 0.05))
-            guard !Task.isCancelled else { return }
-            self?.refresh()
-        }
     }
 
     /// Re-reads the database (changes made by widgets / Control Center / Live Activity intents).
@@ -571,6 +535,11 @@ final class Store {
         let base = activity.map { a in
             sessions.filter { $0.activityID == a.id && $0.end != nil }
                 .reduce(0) { $0 + $1.duration(in: currentPeriod(for: a, now: AppClock.now), now: AppClock.now) }
+        }
+        BreakNotice.schedule(end: activeBreak.map(breakEnd), returningTo: activeBreak.flatMap { self.activity($0.activityID)?.name })
+        if session == nil, let b = activeBreak {
+            LiveActivityController.syncBreak(since: b.start)
+            return
         }
         LiveActivityController.sync(session: session, activity: activity, periodBase: base)
     }

@@ -62,7 +62,7 @@ extension Store {
                                    period: a.period, position: a.position, periodInterval: period, periodLogged: logged,
                                    runningStart: running?.start,
                                    lastUsed: sessions.first { $0.activityID == a.id }?.start)
-        })
+        }, breakStart: activeBreak?.start)
     }
 }
 

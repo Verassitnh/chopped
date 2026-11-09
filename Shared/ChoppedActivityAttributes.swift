@@ -22,7 +22,7 @@ struct ChoppedActivityAttributes: ActivityAttributes {
 
 extension ChoppedActivityAttributes.ContentState {
     var color: TrackerColor { TrackerColor.forHex(colorHex) }
-    var glyph: Glyph { Glyph.tracker(icon) }
+    var glyph: Glyph { icon.flatMap(Glyph.init(rawValue:)) ?? .target }
     var goalPeriod: GoalPeriod { period.flatMap(GoalPeriod.init(rawValue:)) ?? .week }
     var hasGoal: Bool { (goalMinutes ?? 0) > 0 }
 
