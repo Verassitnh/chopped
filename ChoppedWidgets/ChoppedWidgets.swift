@@ -21,14 +21,14 @@ struct ChoppedWidgets: WidgetBundle {
 struct ClockInLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: ChoppedActivityAttributes.self) { context in
-            LockActivityView(state: context.state, isStale: context.isStale)
+            LockActivityView(state: context.state)
                 .activityBackgroundTint(context.state.isOver(at: Date()) ? Drained.bezel : context.state.color.tint)
                 .activitySystemActionForegroundColor(.white)
         } dynamicIsland: { context in
             let state = context.state
             return DynamicIsland {
                 DynamicIslandExpandedRegion(.leading, priority: 1) {
-                    IslandExpandedHeader(state: state, isStale: context.isStale)
+                    IslandExpandedHeader(state: state)
                         .padding(.leading, 6)
                         .dynamicIsland(verticalPlacement: .belowIfTooWide)
                 }
