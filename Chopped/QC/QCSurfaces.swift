@@ -125,6 +125,7 @@ struct QCSurfacesView: View {
         v().frame(width: size.width, height: size.height)
             .background(bg)
             .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+            .containerShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
     }
 
     private func standby(_ s: ChoppedSnapshot, now: Date, style: SquareWidgetStyle) -> some View {
@@ -144,6 +145,7 @@ struct QCSurfacesView: View {
         return HStack(spacing: 28) {
             SmallWidgetView(tracker: t, now: now, style: style, bezel: false)
                 .frame(width: 170, height: 170)
+                .containerShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
                 .scaleEffect(2.2)
                 .frame(width: 374, height: 374)
                 .colorMultiply(night ? red : .white)
@@ -170,6 +172,8 @@ struct QCSurfacesView: View {
             Spacer()
             if let state = s.activityState {
                 LockActivityView(state: state, now: now)
+                    .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+                    .containerShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
             }
         }
         .padding(.horizontal, 14)
