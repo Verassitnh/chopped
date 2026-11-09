@@ -18,16 +18,29 @@ struct HomeView: View {
                 .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
+            if let scheduled = store.scheduledSwitch, store.activeSession == nil {
+                ScheduledSwitchChip(scheduled: scheduled) { toggle { store.cancelScheduledSwitch() } }
+                .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 10, trailing: 12))
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+            }
             ForEach(Array(store.trackers.enumerated()), id: \.element.id) { index, a in
                 // The card is a Button (press feedback: 0.98 spring, off with Reduce Motion); its
                 // Play/Stop are separate Buttons inside the label, so they take their own taps.
                 Button { router.openDetail(a.id) } label: {
                     Ticker(every: store.isRunning(a.id) || store.isOnBreak(a.id) ? 1 : 60) { now in
-                        TrackerCard(activity: a, now: now,
-                                    start: { toggle { store.clockIn(a) } },
-                                    stop: { toggle { store.stop() } },
-                                    takeBreak: { toggle { store.takeBreak(a) } },
-                                    openSwitcher: { router.showingSwitcher = true })
+                        let scheduled = store.scheduledSwitch
+                        VStack(spacing: 8) {
+                            TrackerCard(activity: a, now: now,
+                                        startsAt: scheduled?.to?.id == a.id ? scheduled?.date : nil,
+                                        start: { toggle { store.clockIn(a) } },
+                                        stop: { toggle { store.stop() } },
+                                        takeBreak: { toggle { store.takeBreak(a) } },
+                                        openSwitcher: { router.showingSwitcher = true })
+                            if let scheduled, store.isRunning(a.id) {
+                                ScheduledSwitchChip(scheduled: scheduled) { toggle { store.cancelScheduledSwitch() } }
+                            }
+                        }
                     }
                     .contentShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
                 }
@@ -125,6 +138,7 @@ struct TrackerCard: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let activity: Activity
     let now: Date
+    var startsAt: Date? = nil
     var start: () -> Void
     var stop: () -> Void
     var takeBreak: (() -> Void)? = nil
@@ -300,6 +314,8 @@ struct TrackerCard: View {
                 Group {
                     if let over {
                         Text("\(a.period.adjective) · \(Fmt.goal(minutes: a.goalMinutes)) · ") + overText(over, palette)
+                    } else if let startsAt {
+                        Text("Starts \(Fmt.clock(startsAt)) · " + (a.hasGoal ? "\(Fmt.goal(minutes: a.goalMinutes)) goal" : a.goalLine))
                     } else {
                         Text(metaLine(a))
                     }
@@ -423,5 +439,37 @@ struct BreakStopControl: View {
         }
         .padding(.vertical, 6)
         .background(.black, in: Capsule())
+    }
+}
+
+struct ScheduledSwitchChip: View {
+    let scheduled: Store.ScheduledSwitch
+    let cancel: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(scheduled.to?.color.accent ?? CH.textSecondary)
+                .frame(width: 8, height: 8)
+            Text(title)
+                .geist(13, .medium, lineHeight: 17)
+                .foregroundStyle(CH.text)
+                .lineLimit(1)
+            Spacer(minLength: 8)
+            Button("Cancel", action: cancel)
+                .geist(13, .medium, lineHeight: 17)
+                .foregroundStyle(CH.textSecondary)
+                .buttonStyle(.pressScale)
+                .accessibilityLabel("Cancel scheduled switch")
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(CH.raised, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .accessibilityElement(children: .contain)
+    }
+
+    private var title: String {
+        guard let to = scheduled.to else { return "Clocks out at \(Fmt.clock(scheduled.date))" }
+        return "\(to.name) at \(Fmt.clock(scheduled.date))"
     }
 }

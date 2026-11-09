@@ -21,11 +21,13 @@ struct ChoppedWidgets: WidgetBundle {
 struct ClockInLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: ChoppedActivityAttributes.self) { context in
-            LockActivityView(state: context.state)
-                .activityBackgroundTint(context.state.isOver(at: Date()) ? Drained.bezel : context.state.color.tint)
+            let state = context.state.resolved(at: Date())
+            LockActivityView(state: state)
+                .activityBackgroundTint(state.isOver(at: Date()) ? Drained.bezel : state.color.tint)
                 .activitySystemActionForegroundColor(.white)
         } dynamicIsland: { context in
-            let state = context.state
+            let state = context.state.resolved(at: Date())
+            let isStale = Date() >= state.hourMark
             return DynamicIsland {
                 DynamicIslandExpandedRegion(.leading, priority: 1) {
                     IslandExpandedHeader(state: state)
@@ -45,7 +47,7 @@ struct ClockInLiveActivity: Widget {
             } compactLeading: {
                 IslandIconTile(state: state)
             } compactTrailing: {
-                IslandCompactTimer(state: state, isStale: context.isStale)
+                IslandCompactTimer(state: state, isStale: isStale)
             } minimal: {
                 IslandIconTile(state: state)
             }
@@ -75,9 +77,10 @@ enum ChoppedTimeline {
     static func entries(selectedID: Int64? = nil) -> Timeline<ChoppedEntry> {
         let now = Date()
         let snapshot = ChoppedData.snapshot(now: now)
+        let change = snapshot?.changeDate.flatMap { $0 > now ? $0 : nil }
         guard let snapshot, snapshot.running != nil else {
-            let next = snapshot?.trackers.map(\.periodInterval.end).min().map { min($0, now.addingTimeInterval(3600)) }
-                ?? now.addingTimeInterval(3600)
+            let next = ((snapshot?.trackers.map(\.periodInterval.end) ?? []) + [change].compactMap { $0 })
+                .min().map { min($0, now.addingTimeInterval(3600)) } ?? now.addingTimeInterval(3600)
             return Timeline(entries: [ChoppedEntry(date: now, snapshot: snapshot, selectedID: selectedID)], policy: .after(next))
         }
         let minute = Calendar.current.dateInterval(of: .minute, for: now)?.start ?? now
@@ -90,6 +93,10 @@ enum ChoppedTimeline {
            hourMark > now, let last = entries.last?.date, hourMark < last {
             entries.append(ChoppedEntry(date: hourMark, snapshot: snapshot, selectedID: selectedID))
             entries.sort { $0.date < $1.date }
+        }
+        if let change {
+            entries.removeAll { $0.date >= change }
+            return Timeline(entries: entries, policy: .after(change))
         }
         return Timeline(entries: entries, policy: .atEnd)
     }

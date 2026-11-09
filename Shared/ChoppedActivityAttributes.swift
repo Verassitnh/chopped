@@ -18,6 +18,19 @@ struct ChoppedActivityAttributes: ActivityAttributes {
         var trackerID: Int64? = nil
         var showsTitle: Bool? = nil
         var countsDown: Bool? = nil
+        var endsAt: Date? = nil
+        var next: Upcoming? = nil
+    }
+
+    struct Upcoming: Codable, Hashable {
+        var name: String
+        var colorHex: String
+        var start: Date
+        var icon: String?
+        var periodBase: TimeInterval?
+        var goalMinutes: Int?
+        var period: String?
+        var trackerID: Int64?
     }
 }
 
@@ -48,6 +61,20 @@ extension ChoppedActivityAttributes.ContentState {
     var hourMark: Date { start.addingTimeInterval(3600) }
 
     func staleDate(after now: Date) -> Date? {
-        [overDate, hourMark].compactMap { $0 }.filter { $0 > now }.min()
+        [overDate, hourMark, endsAt].compactMap { $0 }.filter { $0 > now }.min()
+    }
+
+    /// Flips to `next` without the app: relies on `staleDate` including `endsAt` so the system re-renders then.
+    func resolved(at now: Date) -> Self {
+        guard let next, now >= next.start else { return self }
+        return Self(name: next.name, colorHex: next.colorHex, start: next.start, icon: next.icon,
+                    periodBase: next.periodBase, goalMinutes: next.goalMinutes, period: next.period,
+                    trackerID: next.trackerID, showsTitle: showsTitle)
+    }
+
+    var effectiveOverState: Self? {
+        guard let endsAt else { return self }
+        if let overDate, overDate < endsAt { return self }
+        return next.map { resolved(at: $0.start) }
     }
 }

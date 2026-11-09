@@ -158,6 +158,15 @@ struct ChoppedSnapshot: Hashable {
     /// Ordered by position.
     var trackers: [TrackerSnapshot]
     var breakStart: Date? = nil
+    var runningEndsAt: Date? = nil
+    var upcoming: Upcoming? = nil
+
+    struct Upcoming: Hashable {
+        var trackerID: Int64
+        var start: Date
+    }
+
+    var changeDate: Date? { [runningEndsAt, upcoming?.start].compactMap { $0 }.min() }
 
     var running: TrackerSnapshot? { trackers.first(where: \.isRunning) }
     func tracker(_ id: Int64?) -> TrackerSnapshot? { id.flatMap { id in trackers.first { $0.id == id } } }
@@ -170,10 +179,17 @@ struct ChoppedSnapshot: Hashable {
     var activityState: ChoppedActivityAttributes.ContentState? {
         if running == nil, let breakStart { return .onBreak(since: breakStart) }
         guard let r = running, let start = r.runningStart else { return nil }
+        let next = upcoming.flatMap { u in
+            tracker(u.trackerID).map { n in
+                ChoppedActivityAttributes.Upcoming(
+                    name: n.name, colorHex: n.colorHex, start: u.start, icon: n.icon, periodBase: n.periodBase,
+                    goalMinutes: n.goalMinutes, period: n.period.rawValue, trackerID: n.id)
+            }
+        }
         return ChoppedActivityAttributes.ContentState(
             name: r.name, colorHex: r.colorHex, start: start, icon: r.icon,
             periodBase: r.periodBase, goalMinutes: r.goalMinutes, period: r.period.rawValue, trackerID: r.id,
-            showsTitle: AppGroup.liveActivityTitles)
+            showsTitle: AppGroup.liveActivityTitles, endsAt: runningEndsAt, next: next)
     }
 }
 
@@ -192,15 +208,18 @@ enum ChoppedData {
     @discardableResult
     static func start(_ trackerID: Int64, at date: Date = Date()) -> Bool {
         guard let url = ChoppedDB.existingURL, let db = Connection(url: url, readOnly: false) else { return false }
-        let running = db.query("SELECT activity_id FROM sessions WHERE end IS NULL \(db.workOnly)") { sqlite3_column_int64($0, 0) }
-        if running == [trackerID] { return true }
         let hasCompleted = !db.query("SELECT 1 FROM pragma_table_info('activities') WHERE name = 'completed_at'") { _ in 1 }.isEmpty
         if hasCompleted, db.query("SELECT 1 FROM activities WHERE id = ? AND completed_at IS NULL", [trackerID]) { _ in 1 }.isEmpty {
             return false
         }
+        let t = date.timeIntervalSince1970
         db.exec("BEGIN IMMEDIATE")
-        db.exec("UPDATE sessions SET end = ? WHERE end IS NULL", [date.timeIntervalSince1970])
-        db.exec("INSERT INTO sessions (activity_id, start) VALUES (?, ?)", [trackerID, date.timeIntervalSince1970])
+        db.clearSchedule(at: t)
+        let running = db.query("SELECT activity_id FROM sessions WHERE end IS NULL \(db.workOnly)") { sqlite3_column_int64($0, 0) }
+        if running != [trackerID] {
+            db.exec("UPDATE sessions SET end = ? WHERE end IS NULL", [t])
+            db.exec("INSERT INTO sessions (activity_id, start) VALUES (?, ?)", [trackerID, t])
+        }
         db.exec("COMMIT")
         return true
     }
@@ -209,7 +228,11 @@ enum ChoppedData {
     @discardableResult
     static func stop(at date: Date = Date()) -> Bool {
         guard let url = ChoppedDB.existingURL, let db = Connection(url: url, readOnly: false) else { return false }
-        db.exec("UPDATE sessions SET end = ? WHERE end IS NULL", [date.timeIntervalSince1970])
+        let t = date.timeIntervalSince1970
+        db.exec("BEGIN IMMEDIATE")
+        db.clearSchedule(at: t)
+        db.exec("UPDATE sessions SET end = ? WHERE end IS NULL", [t])
+        db.exec("COMMIT")
         return true
     }
 
@@ -230,6 +253,12 @@ enum ChoppedData {
         lazy var workOnly: String = {
             query("SELECT 1 FROM pragma_table_info('sessions') WHERE name = 'is_break'") { _ in 1 }.isEmpty ? "" : "AND is_break = 0"
         }()
+
+        /// Must match `Store.clearSchedule(now:)`.
+        func clearSchedule(at t: TimeInterval) {
+            exec("DELETE FROM sessions WHERE start > ?", [t])
+            exec("UPDATE sessions SET end = NULL WHERE start <= ? AND end > ?", [t, t])
+        }
 
         func exec(_ sql: String, _ params: [Any] = []) {
             var stmt: OpaquePointer?
@@ -298,8 +327,8 @@ enum ChoppedData {
                 let interval = calendar.dateInterval(of: period.calendarComponent, for: now) ?? DateInterval(start: now, duration: 1)
                 var logged: TimeInterval = 0
                 var running: Date?
-                for s in sessions where s.activity == r.id {
-                    guard let end = s.end else { running = s.start; continue }
+                for s in sessions where s.activity == r.id && s.start <= now {
+                    guard let end = s.end, end <= now else { running = s.start; continue }
                     let lo = max(s.start, interval.start), hi = min(end, interval.end)
                     if hi > lo { logged += hi.timeIntervalSince(lo) }
                 }
@@ -307,9 +336,13 @@ enum ChoppedData {
                                        period: period, position: r.position, periodInterval: interval,
                                        periodLogged: logged, runningStart: running, lastUsed: lastUsed[r.id])
             }
-            var snapshot = ChoppedSnapshot(date: now, trackers: trackers)
+            let live = sessions.first { $0.start <= now && ($0.end.map { $0 > now } ?? true) }
+            let upcoming = sessions.filter { $0.start > now }.min { $0.start < $1.start }
+            var snapshot = ChoppedSnapshot(date: now, trackers: trackers, runningEndsAt: live?.end,
+                                           upcoming: upcoming.map { .init(trackerID: $0.activity, start: $0.start) })
             if !workOnly.isEmpty {
-                snapshot.breakStart = query("SELECT start FROM sessions WHERE end IS NULL AND is_break = 1") {
+                let t = now.timeIntervalSince1970
+                snapshot.breakStart = query("SELECT start FROM sessions WHERE is_break = 1 AND start <= ? AND (end IS NULL OR end > ?)", [t, t]) {
                     Date(timeIntervalSince1970: sqlite3_column_double($0, 0))
                 }.first
             }
