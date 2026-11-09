@@ -151,12 +151,16 @@ final class Store {
         reload()
     }
 
+    private(set) var clockTick = 0
+
     var activeSession: WorkSession? {
+        _ = clockTick
         let now = AppClock.now
         return sessions.first { $0.isLive(at: now) }
     }
 
     var pendingSession: WorkSession? {
+        _ = clockTick
         let now = AppClock.now
         return sessions.last { $0.start > now }
     }
@@ -172,11 +176,9 @@ final class Store {
         return nil
     }
 
-    func latestBoundary(now: Date) -> Date? {
-        (sessions + breaks).lazy.filter { $0.start <= now }.map { s in s.isLive(at: now) ? s.start : (s.end ?? s.start) }.max()
-    }
     var activeActivity: Activity? { activeSession.flatMap { activity($0.activityID) } }
     var activeBreak: WorkSession? {
+        _ = clockTick
         let now = AppClock.now
         return breaks.first { $0.isLive(at: now) }
     }
@@ -199,22 +201,30 @@ final class Store {
 
     func clockIn(_ activity: Activity, at date: Date? = nil) {
         let now = AppClock.now
+        let at = date ?? now
         clearSchedule(now: now)
-        guard activeSession?.activityID != activity.id else { return reload() }
-        let at = max(date ?? now, latestBoundary(now: now) ?? .distantPast)
+        let resumes = (sessions + breaks).first { $0.isLive(at: at) && $0.start < at }
+            .map { !$0.isBreak && $0.activityID == activity.id } ?? false
         db.transaction {
-            db.execute("UPDATE sessions SET end = ? WHERE end IS NULL", [at])
-            db.execute("INSERT INTO sessions (activity_id, start) VALUES (?, ?)", [activity.id, at])
+            rewind(to: at)
+            if resumes {
+                db.execute("UPDATE sessions SET end = NULL WHERE end = ? AND activity_id = ? AND is_break = 0", [at, activity.id])
+            } else {
+                db.execute("INSERT INTO sessions (activity_id, start) VALUES (?, ?)", [activity.id, at])
+            }
         }
         reload()
     }
 
     func stop(at date: Date = AppClock.now) {
-        let now = AppClock.now
-        clearSchedule(now: now)
-        let at = max(date, (activeSession ?? activeBreak)?.start ?? .distantPast)
-        db.execute("UPDATE sessions SET end = ? WHERE end IS NULL", [at])
+        clearSchedule(now: AppClock.now)
+        db.transaction { rewind(to: date) }
         reload()
+    }
+
+    private func rewind(to date: Date) {
+        db.execute("DELETE FROM sessions WHERE start >= ?", [date])
+        db.execute("UPDATE sessions SET end = ? WHERE start < ? AND (end IS NULL OR end > ?)", [date, date, date])
     }
 
     func takeBreak(_ activity: Activity) {
@@ -581,14 +591,18 @@ final class Store {
         guard wait > 0 else { return }
         switchReload = Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: UInt64((wait + 0.05) * 1_000_000_000))
-            guard !Task.isCancelled else { return }
-            self?.reload()
+            guard !Task.isCancelled, let self else { return }
+            clockTick += 1
+            reload()
         }
     }
 
     /// Re-reads the database (changes made by widgets / Control Center / Live Activity intents).
     /// `silent`: don't emit a `clockEvent` (foreground refresh after changes made while away).
-    func refresh(silent: Bool = false) { reload(silent: silent) }
+    func refresh(silent: Bool = false) {
+        clockTick += 1
+        reload(silent: silent)
+    }
 
     /// Also called when the app returns to the foreground, to restart a Live Activity the system ended.
     func syncLiveActivity() {

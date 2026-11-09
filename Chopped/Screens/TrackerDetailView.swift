@@ -361,17 +361,14 @@ private struct DetailHeader: View {
                     } else if breakSession != nil {
                         secondaryButton(glyph: nil, title: "End break", action: endBreak)
                     }
-                    Button(action: breakSession != nil ? openSwitcher : toggle) {
+                    Button(action: running || breakSession != nil ? openSwitcher : toggle) {
                         HStack(spacing: 10) {
-                            if running {
-                                RoundedRectangle(cornerRadius: 4, style: .continuous).fill(accent)
-                                    .frame(width: 16, height: 16)
-                            } else if breakSession != nil {
+                            if running || breakSession != nil {
                                 GlyphView(.swap, size: 18, color: accent)
                             } else {
                                 GlyphView(.play, size: 14, color: accent)
                             }
-                            Text(running ? "Stop" : breakSession != nil ? "Switch" : "Start")
+                            Text(running || breakSession != nil ? "Switch" : "Start")
                                 .geist(17, .semibold, lineHeight: 21)
                                 .foregroundStyle(.white)
                                 .contentTransition(.interpolate)

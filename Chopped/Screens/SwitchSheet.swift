@@ -81,7 +81,7 @@ struct SwitchSheet: View {
     private func header(now: Date, at: Date) -> some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Switch to…")
+                Text("Switch Tracker")
                     .geist(22, .semibold, tracking: -0.015, lineHeight: 28)
                     .foregroundStyle(CH.text)
                 subtitle(now: now, at: at)
@@ -101,6 +101,10 @@ struct SwitchSheet: View {
             Text(now >= end ? "Break over by \(Fmt.hms(now.timeIntervalSince(end)))" : "Break ends in \(Fmt.hms(end.timeIntervalSince(now)))")
                 .geist(14, .medium, lineHeight: 18)
                 .monospacedDigit()
+                .foregroundStyle(CH.textSecondary)
+        } else if let session = store.activeSession, let running = store.activeActivity, at < session.start {
+            Text("Replaces \(running.name) since \(Fmt.clock(session.start))")
+                .geist(14, .medium, lineHeight: 18)
                 .foregroundStyle(CH.textSecondary)
         } else if let session = store.activeSession, let running = store.activeActivity {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -172,11 +176,7 @@ struct SwitchSheet: View {
 
     private func isNow(_ now: Date) -> Bool { offset(now: now) == 0 }
 
-    private func range(now: Date) -> ClosedRange<Int> {
-        let base = Self.minute(now)
-        let earliest = store.latestBoundary(now: now).map { Int(ceil($0.timeIntervalSince(base) / 60)) } ?? -Self.reach
-        return min(0, max(-Self.reach, earliest))...Self.reach
-    }
+    private func range(now: Date) -> ClosedRange<Int> { -Self.reach...Self.reach }
 
     private func offset(now: Date) -> Int {
         guard let picked else { return 0 }
