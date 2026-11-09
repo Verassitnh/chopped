@@ -35,14 +35,27 @@ struct LockActivityView: View {
     }
 
     private func row(drained: Bool, over: Bool) -> some View {
-        HStack(spacing: 12) {
-            LiveTimerText(start: state.start, style: over ? .selfUpdating : .hms, now: now,
-                          pastHour: isStale && !over)
-                .geistPixel(68)
-                .foregroundStyle(drained ? Drained.text : CH.onAccent)
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
-                .frame(maxWidth: .infinity, minHeight: 68, maxHeight: 68, alignment: .leading)
+        let foreground = drained ? Drained.text : CH.onAccent
+        let titled = state.showsTitle == true
+        return HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: titled ? LockTitleLayout.spacing : 0) {
+                if titled {
+                    Text(state.name.uppercased())
+                        .geistMono(LockTitleLayout.titleSize, .medium, tracking: 0.08)
+                        .foregroundStyle(foreground.opacity(0.55))
+                        .lineLimit(1)
+                        .padding(.leading, LockTitleLayout.titleIndent)
+                }
+                LiveTimerText(start: state.start, style: over ? .selfUpdating : .hms, now: now,
+                              pastHour: isStale && !over)
+                    .geistPixel(titled ? LockTitleLayout.timerSize : 68)
+                    .foregroundStyle(foreground)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+            }
+            .offset(y: titled ? LockTitleLayout.nudge : 0)
+            .frame(maxWidth: .infinity, minHeight: LockTitleLayout.height(titled: titled),
+                   maxHeight: LockTitleLayout.height(titled: titled), alignment: .leading)
             SwitchLink {
                 SurfaceSwapGlyph(size: 52, foreground: state.color.accent)
             }
@@ -176,5 +189,27 @@ struct IslandExpandedView: View {
             IslandExpandedFooter(state: state, now: now)
         }
         .padding(EdgeInsets(top: 18, leading: 18, bottom: 16, trailing: 18))
+    }
+}
+
+/// Places the optional title over the timer so the visible ink (cap tops to digit baselines) is what
+/// gets centred against the swap button, not the text boxes. Geist Mono and Geist Pixel share ascent
+/// 1.005em / descent 0.295em; caps are 0.71em (mono) and 0.722em (pixel); the tabular pixel "0" starts
+/// ~0.097em in and mono caps ~0.08em in.
+private enum LockTitleLayout {
+    static let titleSize: CGFloat = 11
+    static let timerSize: CGFloat = 56
+
+    static let titleInkTop = titleSize * (1.005 - 0.71)
+    static let timerInkTop = timerSize * (1.005 - 0.15 - 0.722)
+    static let timerInkBottom = timerSize * (0.295 - 0.15)
+
+    static let inkGap: CGFloat = 10
+    static let spacing = inkGap - titleInkTop - timerInkTop
+    static let nudge = (timerInkBottom - titleInkTop) / 2
+    static let titleIndent = timerSize * 0.097 - titleSize * 0.08
+
+    static func height(titled: Bool) -> CGFloat {
+        titled ? max(68, (titleSize * 1.3 + spacing + timerSize).rounded(.up)) : 68
     }
 }

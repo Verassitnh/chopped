@@ -5,6 +5,7 @@ struct SettingsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage(BreakSettings.minutesKey) private var breakMinutes = BreakSettings.defaultMinutes
     @AppStorage(BreakSettings.autoResumeKey) private var autoResume = true
+    @AppStorage(AppGroup.liveActivityTitlesKey, store: AppGroup.defaults) private var liveActivityTitles = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -20,6 +21,18 @@ struct SettingsSheet: View {
             }
             .padding(.horizontal, 16)
             .padding(.top, 16)
+
+            SectionLabelText("Live Activity")
+                .padding(.horizontal, 24)
+                .padding(.top, 28)
+                .padding(.bottom, 10)
+
+            row("Show tracker name") {
+                Toggle("Show tracker name", isOn: $liveActivityTitles).labelsHidden()
+            }
+            .padding(.horizontal, 16)
+            .background(CH.raised, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .padding(.horizontal, 20)
 
             SectionLabelText("Breaks")
                 .padding(.horizontal, 24)
@@ -48,12 +61,13 @@ struct SettingsSheet: View {
         }
         .background(CH.sheet)
         .presentationBackground(CH.sheet)
-        .presentationDetents([.medium])
+        .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(30)
         .tint(CH.up)
         .onChange(of: breakMinutes) { store.refresh(silent: true) }
         .onChange(of: autoResume) { store.refresh(silent: true) }
+        .onChange(of: liveActivityTitles) { store.syncLiveActivity() }
     }
 
     private func row<Trailing: View>(_ title: String, @ViewBuilder trailing: () -> Trailing) -> some View {
