@@ -357,7 +357,8 @@ struct BreakCard: View {
         let end = store.breakEnd(session)
         let over = now >= end
         let length = max(1, end.timeIntervalSince(session.start))
-        let shown = over ? now.timeIntervalSince(end) : end.timeIntervalSince(now)
+        let overBy = now.timeIntervalSince(end)
+        let shown = over ? now.timeIntervalSince(session.start) : -overBy
         TrackerBezel(color: green) {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 6) {
@@ -367,15 +368,23 @@ struct BreakCard: View {
                             .geist(20, .semibold, tracking: -0.015, lineHeight: 24)
                             .foregroundStyle(CH.onAccent)
                     }
-                    Text((over ? "+" : "") + Fmt.hms(shown)).monospacedDigit()
+                    Text(Fmt.hms(shown)).monospacedDigit()
                         .geistPixel(62)
                         .foregroundStyle(CH.onAccent)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
                         .contentTransition(.numericText(countsDown: !over))
                         .animation(.snappy(duration: 0.25), value: Int(shown))
-                        .accessibilityLabel(over ? "Break over by \(Fmt.words(shown))" : "\(Fmt.words(shown)) of break left")
-                    Text(over ? "Over · switch back to \(activity.name)" : "From \(activity.name) · ends \(Fmt.time(end))")
+                        .accessibilityLabel(over ? "On break for \(Fmt.words(shown)), \(Fmt.words(overBy)) over"
+                                                 : "\(Fmt.words(shown)) of break left")
+                    Group {
+                        if over {
+                            Text("From \(activity.name) · ")
+                                + Text("+\(Fmt.timer(overBy)) over").font(.geist(13, .semibold)).foregroundStyle(CH.onAccent)
+                        } else {
+                            Text("From \(activity.name) · ends \(Fmt.time(end))")
+                        }
+                    }
                         .geist(13, .medium, lineHeight: 17)
                         .foregroundStyle(CH.onAccentSecondary)
                         .lineLimit(1)

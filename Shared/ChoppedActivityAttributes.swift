@@ -17,6 +17,7 @@ struct ChoppedActivityAttributes: ActivityAttributes {
         /// Running tracker's id (deep links / intents).
         var trackerID: Int64? = nil
         var showsTitle: Bool? = nil
+        var countsDown: Bool? = nil
     }
 }
 
@@ -41,6 +42,8 @@ extension ChoppedActivityAttributes.ContentState {
     }
 
     func isOver(at now: Date) -> Bool { overDate.map { now > $0 } ?? false }
+
+    var countdownEnd: Date? { countsDown == true ? overDate : nil }
 
     var hourMark: Date { start.addingTimeInterval(3600) }
 

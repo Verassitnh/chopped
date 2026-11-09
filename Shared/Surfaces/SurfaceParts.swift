@@ -3,21 +3,26 @@ import SwiftUI
 
 // Building blocks shared by the Live Activity, Dynamic Island, widgets and their in-app QC hosts.
 
-/// Running timer in the system's own count-up format ("0:01", "50:01", "1:00:46"), live in WidgetKit /
-/// ActivityKit without timeline reloads. Renders the same string statically when `AppClock` is frozen.
+/// Running timer in the system's own format ("0:01", "50:01", "1:00:46"), live in WidgetKit / ActivityKit
+/// without timeline reloads. With `countdownTo` it counts down to that date, then up past it with a "+".
+/// Renders the same string statically when `AppClock` is frozen.
 struct LiveTimerText: View {
     let start: Date
+    var countdownTo: Date? = nil
     var now: Date = AppClock.now
 
     var body: some View {
-        Group {
-            if AppClock.isFrozen {
-                Text(Fmt.timer(now.timeIntervalSince(start)))
-            } else {
-                Text(timerInterval: start...Date.distantFuture, countsDown: false)
-            }
+        text.monospacedDigit()
+    }
+
+    private var text: Text {
+        if let end = countdownTo {
+            let sign = Text(now >= end ? "+" : "")
+            return AppClock.isFrozen ? sign + Text(Fmt.timer(abs(end.timeIntervalSince(now))))
+                                     : sign + Text(end, style: .timer)
         }
-        .monospacedDigit()
+        return AppClock.isFrozen ? Text(Fmt.timer(now.timeIntervalSince(start)))
+                                 : Text(timerInterval: start...Date.distantFuture, countsDown: false)
     }
 }
 
